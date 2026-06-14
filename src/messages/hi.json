@@ -1,0 +1,121 @@
+{
+  "common": {
+    "appName": "TheoryForge",
+    "dashboard": "Dashboard",
+    "projects": "Projects",
+    "hypotheses": "Hypotheses",
+    "settings": "Settings",
+    "newHypothesis": "New Hypothesis",
+    "createProject": "Create Project",
+    "startBreakthrough": "Start Breakthrough",
+    "save": "Save",
+    "status": "Status",
+    "progress": "Progress",
+    "unknown": "Unknown",
+    "view": "View",
+    "back": "Back",
+    "language": "Language",
+    "submit": "Submit",
+    "title": "Title",
+    "description": "Description",
+    "domain": "Domain",
+    "optional": "optional",
+    "project": "Project",
+    "summary": "Summary"
+  },
+  "landing": {
+    "heroTitle": "Turn Impossible Ideas Into Testable Models",
+    "heroText": "TheoryForge transforms wild scientific and engineering hypotheses into condition maps, blockers, progress scores, experiments and breakthrough paths.",
+    "cta": "Start Research",
+    "secondary": "View Demo Lab",
+    "principle": "AI does not invent the breakthrough for you. It helps you think, model, calculate and test faster."
+  },
+  "dashboard": {
+    "title": "Research Dashboard",
+    "subtitle": "Your projects, hypotheses and active breakthrough sessions.",
+    "research": "Research Progress",
+    "functionality": "Real-World Functionality",
+    "testability": "Testability",
+    "recentProjects": "Recent Projects",
+    "recentHypotheses": "Recent Hypotheses",
+    "activeBreakthroughs": "Active Breakthroughs"
+  },
+  "projects": {
+    "title": "Research Projects",
+    "newTitle": "New project title",
+    "empty": "No projects yet."
+  },
+  "hypothesis": {
+    "createTitle": "Create hypothesis",
+    "rawText": "Hypothesis text",
+    "rawPlaceholder": "Describe your scientific or engineering idea...",
+    "workspace": "Hypothesis Workspace",
+    "researchProgress": "Research Progress",
+    "functionalityProgress": "Real-World Functionality",
+    "testabilityProgress": "Testability",
+    "overallStatus": "Overall Status",
+    "realityGap": "Reality Gap",
+    "mainBlockers": "Main Blockers",
+    "nextBestAction": "Next Best Action",
+    "tabs": {
+      "overview": "Overview",
+      "model": "Model",
+      "breakthrough": "Breakthrough Map",
+      "visual": "Visual Lab",
+      "experiments": "Experiments",
+      "simulations": "Simulations",
+      "sources": "Sources",
+      "versions": "Versions"
+    },
+    "conditions": "Required Conditions",
+    "ifSolved": "If solved, what changes",
+    "known": "What is known",
+    "unknown": "What is unknown",
+    "blockers": "Blockers",
+    "conflicts": "Conflicts",
+    "testMethod": "Suggested test method",
+    "pathToTestability": "Path to testability"
+  },
+  "breakthrough": {
+    "title": "Active Breakthrough",
+    "problem": "Problem Statement",
+    "why": "Why this matters",
+    "ifSolved": "If solved, what changes",
+    "known": "Current known state",
+    "missing": "Missing pieces",
+    "paths": "Possible paths",
+    "bestPath": "Current best path",
+    "yourTheory": "Your theory",
+    "yourTheoryPlaceholder": "Propose a mechanism, assumption, parameter change or workaround...",
+    "checkIdea": "Check this idea",
+    "ideas": "Idea branches",
+    "labLog": "Lab Log",
+    "suggestedNext": "Suggested next action",
+    "impact": "Progress impact",
+    "newBlockers": "New blockers",
+    "reducedBlockers": "Reduced blockers"
+  },
+  "visual": {
+    "objects": "Objects",
+    "fields": "Forces / Fields",
+    "variables": "Variables",
+    "constraints": "Constraints",
+    "measurements": "Measurements"
+  },
+  "experiments": {
+    "title": "Experiments",
+    "equipment": "Required equipment",
+    "signal": "Expected signal",
+    "falsification": "Falsification criteria",
+    "safety": "Safety"
+  },
+  "settings": {
+    "title": "Settings",
+    "preferredLanguage": "Preferred language",
+    "privacy": "Privacy placeholder"
+  },
+  "admin": {
+    "title": "Analysis Prompts",
+    "placeholder": "Prompt management placeholder"
+  }
+}

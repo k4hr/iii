@@ -1,33 +1,27 @@
-# iii
+# TheoryForge
 
-A clean Next.js foundation for the next build.
+AI research workspace for unconventional scientific and engineering hypotheses.
 
-## Stack
-
-- Next.js 16 with the App Router
-- React 19
-- TypeScript
-- Tailwind CSS 4
-- ESLint
-
-## Local development
+## Local setup
 
 ```bash
 npm install
-copy .env.example .env.local
+cp .env.example .env
+# set DATABASE_URL
+npx prisma db push
+npm run db:seed
 npm run dev
 ```
 
-Open `http://localhost:3000`.
+Open `/en` or `/ru`.
 
-## Commands
+## Railway deploy
 
-```bash
-npm run dev
-npm run build
-npm run start
-npm run lint
-npm run typecheck
-```
+1. Push this repo to GitHub.
+2. Create Railway service from repo.
+3. Add PostgreSQL plugin.
+4. Set env var `DATABASE_URL` from Railway PostgreSQL.
+5. Build command: `npm run build`
+6. Start command: `npm run railway:start`
 
-The starter intentionally leaves persistence and authentication unopinionated. Add Prisma, a database, or an auth provider when the first feature makes their requirements concrete.
+Real OpenAI integration is intentionally not enabled yet. Mock AI services live in `src/lib/ai` and are designed to be replaced later.

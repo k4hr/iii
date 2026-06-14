@@ -1,0 +1,121 @@
+{
+  "common": {
+    "appName": "TheoryForge",
+    "dashboard": "Панель",
+    "projects": "Проекты",
+    "hypotheses": "Гипотезы",
+    "settings": "Настройки",
+    "newHypothesis": "Новая гипотеза",
+    "createProject": "Создать проект",
+    "startBreakthrough": "Начать прорыв",
+    "save": "Сохранить",
+    "status": "Статус",
+    "progress": "Прогресс",
+    "unknown": "Неизвестно",
+    "view": "Открыть",
+    "back": "Назад",
+    "language": "Язык",
+    "submit": "Отправить",
+    "title": "Название",
+    "description": "Описание",
+    "domain": "Область",
+    "optional": "необязательно",
+    "project": "Проект",
+    "summary": "Резюме"
+  },
+  "landing": {
+    "heroTitle": "Превращай невозможные идеи в научные модели.",
+    "heroText": "TheoryForge раскладывает нестандартные гипотезы на карту условий, блокеры, эксперименты, визуальные модели и путь к проверке.",
+    "cta": "Войти в лабораторию",
+    "secondary": "Создать гипотезу",
+    "principle": "ИИ не делает прорыв вместо тебя. Он помогает быстрее думать, моделировать, считать и проверять."
+  },
+  "dashboard": {
+    "title": "Исследовательская панель",
+    "subtitle": "Твои проекты, гипотезы и активные сессии прорыва.",
+    "research": "Прогресс изучения",
+    "functionality": "Работоспособность в реальности",
+    "testability": "Проверяемость",
+    "recentProjects": "Последние проекты",
+    "recentHypotheses": "Последние гипотезы",
+    "activeBreakthroughs": "Активные прорывы"
+  },
+  "projects": {
+    "title": "Исследовательские проекты",
+    "newTitle": "Название нового проекта",
+    "empty": "Проектов пока нет."
+  },
+  "hypothesis": {
+    "createTitle": "Создать гипотезу",
+    "rawText": "Текст гипотезы",
+    "rawPlaceholder": "Опиши научную или инженерную идею...",
+    "workspace": "Рабочая область гипотезы",
+    "researchProgress": "Прогресс изучения",
+    "functionalityProgress": "Работоспособность",
+    "testabilityProgress": "Проверяемость",
+    "overallStatus": "Общий статус",
+    "realityGap": "Разрыв до реальности",
+    "mainBlockers": "Главные блокеры",
+    "nextBestAction": "Лучший следующий шаг",
+    "tabs": {
+      "overview": "Обзор",
+      "model": "Модель",
+      "breakthrough": "Карта прорыва",
+      "visual": "Визуальная лаборатория",
+      "experiments": "Эксперименты",
+      "simulations": "Симуляции",
+      "sources": "Источники",
+      "versions": "Версии"
+    },
+    "conditions": "Необходимые условия",
+    "ifSolved": "Что изменится, если решить",
+    "known": "Что известно",
+    "unknown": "Что неизвестно",
+    "blockers": "Блокеры",
+    "conflicts": "Конфликты",
+    "testMethod": "Метод проверки",
+    "pathToTestability": "Путь к проверяемости"
+  },
+  "breakthrough": {
+    "title": "Активный прорыв",
+    "problem": "Постановка проблемы",
+    "why": "Почему это важно",
+    "ifSolved": "Что изменится, если решить",
+    "known": "Что известно сейчас",
+    "missing": "Чего не хватает",
+    "paths": "Возможные пути",
+    "bestPath": "Текущий лучший путь",
+    "yourTheory": "Твоя теория",
+    "yourTheoryPlaceholder": "Предложи механизм, допущение, изменение параметров или обход...",
+    "checkIdea": "Проверить идею",
+    "ideas": "Ветки идей",
+    "labLog": "Журнал лаборатории",
+    "suggestedNext": "Следующий шаг",
+    "impact": "Влияние на прогресс",
+    "newBlockers": "Новые блокеры",
+    "reducedBlockers": "Ослабленные блокеры"
+  },
+  "visual": {
+    "objects": "Объекты",
+    "fields": "Силы / поля",
+    "variables": "Переменные",
+    "constraints": "Ограничения",
+    "measurements": "Измерения"
+  },
+  "experiments": {
+    "title": "Эксперименты",
+    "equipment": "Оборудование",
+    "signal": "Ожидаемый сигнал",
+    "falsification": "Критерий опровержения",
+    "safety": "Безопасность"
+  },
+  "settings": {
+    "title": "Настройки",
+    "preferredLanguage": "Предпочитаемый язык",
+    "privacy": "Приватность"
+  },
+  "admin": {
+    "title": "Промпты анализа",
+    "placeholder": "Заглушка управления промптами"
+  }
+}

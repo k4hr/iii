@@ -1,0 +1,444 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Locale {
+  EN
+  RU
+  ES
+  DE
+  FR
+  ZH
+  JA
+  KO
+  AR
+  PT
+  HI
+}
+enum HypothesisStatus {
+  QUEUED
+  ANALYZING
+  DONE
+  FAILED
+}
+enum Scale {
+  QUANTUM
+  ATOMIC
+  MOLECULAR
+  NANO
+  MICRO
+  HUMAN
+  PLANETARY
+  STELLAR
+  COSMOLOGICAL
+  UNKNOWN
+}
+enum VerdictLevel {
+  FUNDAMENTALLY_FORBIDDEN
+  MATHEMATICALLY_POSSIBLE_NOT_PROVEN
+  PHYSICALLY_POSSIBLE_ENGINEERING_BLOCKED
+  ENGINEERING_POSSIBLE_EXPENSIVE_OR_DANGEROUS
+  TESTABLE_WITH_SMALL_EXPERIMENTS
+  INSUFFICIENTLY_DEFINED
+}
+enum HypothesisOverallStatus {
+  UNDEFINED
+  UNDER_REVIEW
+  THEORETICALLY_CONFLICTED
+  PHYSICS_PLAUSIBLE_ENGINEERING_BLOCKED
+  NEEDS_BREAKTHROUGH
+  TESTABLE_MICRO_VERSION
+  PROTOTYPE_READY
+  WORKING_IN_LIMITED_SCOPE
+}
+enum RealityGapLevel {
+  LOW
+  MEDIUM
+  HIGH
+  EXTREME
+  UNKNOWN
+}
+enum ConditionStatus {
+  KNOWN_WORKING
+  KNOWN_LIMITED
+  UNKNOWN
+  CONFLICTS_WITH_KNOWN_SCIENCE
+  ENGINEERING_BLOCKED
+  NEEDS_BREAKTHROUGH
+  TESTABLE
+  UNDEFINED
+}
+enum ConditionImportance {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+enum BreakthroughStatus {
+  ACTIVE
+  PAUSED
+  SOLVED_THEORETICALLY
+  SOLVED_EXPERIMENTALLY
+  BLOCKED
+  ABANDONED
+}
+enum IdeaAuthorType {
+  USER
+  AI
+  TEAM_MEMBER
+}
+enum IdeaStatus {
+  NEEDS_REVIEW
+  NEEDS_FORMALIZATION
+  PROMISING
+  WEAK
+  CONTRADICTED
+  NEEDS_MATH
+  NEEDS_EXPERIMENT
+  BLOCKED
+  ARCHIVED
+}
+enum BreakthroughEventType {
+  USER_NOTE
+  AI_REASONING_STEP
+  PARAMETER_CHANGE
+  CALCULATION_RUN
+  NEW_PATH_FOUND
+  SUB_HYPOTHESIS_CREATED
+  SOURCE_ADDED
+  STATUS_CHANGED
+}
+enum BreakthroughCheckType {
+  PHYSICS_REVIEW
+  ENGINEERING_REVIEW
+  MATH_FORMALIZATION
+  ORDER_OF_MAGNITUDE_CALC
+  EXPERIMENT_DESIGN
+  SAFETY_REVIEW
+  ANALOGY_SEARCH
+  SOURCE_CHECK
+}
+enum ExperimentType {
+  THOUGHT_EXPERIMENT
+  COMPUTER_SIMULATION
+  SMALL_LAB_TEST
+  PRECISION_MEASUREMENT
+  MATERIAL_TEST
+  SAFETY_TEST
+}
+enum ExperimentDifficulty {
+  LOW
+  MEDIUM
+  HIGH
+  EXTREME
+}
+enum SafetyLevel {
+  SAFE
+  CAUTION
+  LAB_ONLY
+  DANGEROUS
+  THEORETICAL_ONLY
+}
+enum SourceType {
+  PAPER
+  BOOK
+  PATENT
+  DATASET
+  ARTICLE
+  DOCUMENTATION
+  MOCK
+}
+enum SourceRelationship {
+  SUPPORTS_PART
+  CONTRADICTS
+  BACKGROUND
+  ANALOGY
+  ENGINEERING_LIMIT
+  MATHEMATICAL_BASIS
+}
+
+model User {
+  id              String   @id @default(cuid())
+  email           String?  @unique
+  name            String?
+  preferredLocale Locale   @default(EN)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  projects        Project[]
+  hypotheses      Hypothesis[]
+  breakthroughSessions BreakthroughSession[]
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  title       String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  hypotheses  Hypothesis[]
+  breakthroughSessions BreakthroughSession[]
+}
+
+model Hypothesis {
+  id                    String   @id @default(cuid())
+  userId                String?
+  user                  User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  projectId             String?
+  project               Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  originalLocale        Locale
+  originalTitle         String
+  originalText          String
+  canonicalTitleEn      String?
+  canonicalTextEn       String?
+  interfaceLocaleAtCreate Locale
+  analysisLocale        Locale
+  domain                String?
+  status                HypothesisStatus @default(QUEUED)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  versions              HypothesisVersion[]
+  analyses              HypothesisAnalysis[]
+  conditions            HypothesisCondition[]
+  visualScenes          VisualScene[]
+  experiments           ExperimentProposal[]
+  sources               SourceReference[]
+  breakthroughSessions  BreakthroughSession[]
+  simulationRuns        SimulationRun[]
+}
+
+model HypothesisVersion {
+  id              String @id @default(cuid())
+  hypothesisId    String
+  hypothesis      Hypothesis @relation(fields: [hypothesisId], references: [id], onDelete: Cascade)
+  versionNumber   Int
+  title           String
+  text            String
+  canonicalTextEn String?
+  changeSummary   String?
+  createdAt       DateTime @default(now())
+}
+
+model HypothesisAnalysis {
+  id                    String @id @default(cuid())
+  hypothesisId          String
+  hypothesis            Hypothesis @relation(fields: [hypothesisId], references: [id], onDelete: Cascade)
+  canonicalJson         Json
+  scale                 Scale
+  verdictLevel          VerdictLevel
+  confidence            Float
+  researchProgress      Float @default(0)
+  functionalityProgress Float @default(0)
+  testabilityProgress   Float @default(0)
+  overallStatus         HypothesisOverallStatus
+  realityGap            RealityGapLevel
+  mainBlockersJson      Json
+  progressBreakdownJson Json
+  createdAt             DateTime @default(now())
+  translations          HypothesisAnalysisTranslation[]
+  conditions            HypothesisCondition[]
+  visualScenes          VisualScene[]
+}
+
+model HypothesisAnalysisTranslation {
+  id                       String @id @default(cuid())
+  analysisId               String
+  analysis                 HypothesisAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  locale                   Locale
+  summary                  String
+  formalizedClaim          String
+  targetObject             String?
+  knownScience             String
+  physicalConstraints      Json
+  engineeringConstraints   Json
+  contradictions           Json
+  unknowns                 Json
+  rescuePaths              Json
+  minimalExperiments       Json
+  verdictText              String
+  createdAt                DateTime @default(now())
+  @@unique([analysisId, locale])
+}
+
+model HypothesisCondition {
+  id                   String @id @default(cuid())
+  hypothesisId          String
+  hypothesis            Hypothesis @relation(fields: [hypothesisId], references: [id], onDelete: Cascade)
+  analysisId            String?
+  analysis              HypothesisAnalysis? @relation(fields: [analysisId], references: [id], onDelete: SetNull)
+  parentId              String?
+  parent                HypothesisCondition? @relation("ConditionTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children              HypothesisCondition[] @relation("ConditionTree")
+  title                 String
+  description           String
+  status                ConditionStatus
+  importance            ConditionImportance
+  confidence            Float
+  completionScore       Float @default(0)
+  knownWhat             String?
+  unknownWhat           String?
+  blockers              Json
+  conflicts             Json
+  requiredEvidence      Json
+  possibleWorkarounds   Json
+  testMethod            String?
+  ifSolvedImpactJson    Json?
+  progressImpactJson    Json?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  experiments           ExperimentProposal[]
+  breakthroughSessions  BreakthroughSession[]
+}
+
+model VisualScene {
+  id              String @id @default(cuid())
+  hypothesisId    String
+  hypothesis      Hypothesis @relation(fields: [hypothesisId], references: [id], onDelete: Cascade)
+  analysisId      String?
+  analysis        HypothesisAnalysis? @relation(fields: [analysisId], references: [id], onDelete: SetNull)
+  sceneType       String
+  scale           Scale
+  objectsJson     Json
+  variablesJson   Json
+  constraintsJson Json
+  measurementsJson Json
+  createdAt       DateTime @default(now())
+}
+
+model ExperimentProposal {
+  id                    String @id @default(cuid())
+  hypothesisId           String
+  hypothesis             Hypothesis @relation(fields: [hypothesisId], references: [id], onDelete: Cascade)
+  conditionId            String?
+  condition              HypothesisCondition? @relation(fields: [conditionId], references: [id], onDelete: SetNull)
+  title                  String
+  description            String
+  experimentType         ExperimentType
+  difficulty             ExperimentDifficulty
+  safetyLevel            SafetyLevel
+  requiredEquipmentJson  Json
+  expectedSignal         String?
+  falsificationCriteria  String?
+  createdAt              DateTime @default(now())
+}
+
+model SimulationRun {
+  id             String @id @default(cuid())
+  hypothesisId   String
+  hypothesis     Hypothesis @relation(fields: [hypothesisId], references: [id], onDelete: Cascade)
+  title          String
+  status         String
+  parametersJson Json
+  resultJson     Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model SourceReference {
+  id                       String @id @default(cuid())
+  hypothesisId              String
+  hypothesis                Hypothesis @relation(fields: [hypothesisId], references: [id], onDelete: Cascade)
+  title                     String
+  url                       String?
+  sourceType                SourceType
+  relationshipToHypothesis  SourceRelationship
+  summary                   String
+  createdAt                 DateTime @default(now())
+}
+
+model BreakthroughSession {
+  id              String @id @default(cuid())
+  userId          String?
+  user            User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  projectId       String?
+  project         Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  hypothesisId    String
+  hypothesis      Hypothesis @relation(fields: [hypothesisId], references: [id], onDelete: Cascade)
+  conditionId     String
+  condition       HypothesisCondition @relation(fields: [conditionId], references: [id], onDelete: Cascade)
+  title           String
+  status          BreakthroughStatus @default(ACTIVE)
+  problemStatement String
+  whyItMatters    String?
+  ifSolvedImpact  Json
+  knownState      Json
+  missingPieces   Json
+  blockers        Json
+  conflicts       Json
+  possiblePaths   Json
+  currentBestPath String?
+  progressScore   Float @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  ideas           BreakthroughIdea[]
+  events          BreakthroughEvent[]
+}
+
+model BreakthroughIdea {
+  id              String @id @default(cuid())
+  sessionId       String
+  session         BreakthroughSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  authorType      IdeaAuthorType
+  title           String
+  rawText         String
+  formalizedText  String?
+  status          IdeaStatus @default(NEEDS_REVIEW)
+  impactJson      Json?
+  reviewJson      Json?
+  assumptionsJson Json?
+  newBlockersJson Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  checks          BreakthroughCheck[]
+}
+
+model BreakthroughCheck {
+  id          String @id @default(cuid())
+  ideaId      String
+  idea        BreakthroughIdea @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  checkType   BreakthroughCheckType
+  resultJson  Json
+  createdAt   DateTime @default(now())
+}
+
+model BreakthroughEvent {
+  id          String @id @default(cuid())
+  sessionId   String
+  session     BreakthroughSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  type        BreakthroughEventType
+  content     Json
+  createdAt   DateTime @default(now())
+}
+
+model PhysicalLaw {
+  id          String @id @default(cuid())
+  slug        String @unique
+  title       String
+  description String
+  domain      String?
+  createdAt   DateTime @default(now())
+}
+
+model UnsolvedProblem {
+  id          String @id @default(cuid())
+  slug        String @unique
+  title       String
+  description String
+  domain      String?
+  createdAt   DateTime @default(now())
+}
+
+model AnalysisPrompt {
+  id        String @id @default(cuid())
+  key       String @unique
+  title     String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
