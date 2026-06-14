@@ -6,7 +6,10 @@ import {prisma} from '@/lib/db/prisma';
 import {detectLanguage} from '@/lib/ai/detect-language';
 import {createCanonicalHypothesis} from '@/lib/ai/create-canonical-hypothesis';
 import {analyzeHypothesisMock} from '@/lib/ai/analyze-hypothesis';
+import {getOpenAIClient} from '@/lib/ai/openai-client';
 import {routeLocaleToPrisma} from '@/lib/locale/locale';
+import {getConditionImportanceLabel} from '@/lib/locale/enum-labels';
+import {localizeMockValue} from '@/lib/locale/mock-copy';
 
 function jsonValueOrObject(value: Prisma.JsonValue | null | undefined): Prisma.InputJsonValue {
   if (value === null || value === undefined) return {};
@@ -28,10 +31,12 @@ export async function createHypothesisAction(locale: string, formData: FormData)
   const projectId = String(formData.get('projectId') || '').trim() || undefined;
   if (!title || !rawText) return;
 
+  getOpenAIClient();
+
   const originalLocale = detectLanguage(`${title}\n${rawText}`);
   const analysisLocale = routeLocaleToPrisma(locale);
   const canonical = createCanonicalHypothesis({title, text: rawText, locale: originalLocale});
-  const mock = analyzeHypothesisMock({title: canonical.canonicalTitleEn, text: canonical.canonicalTextEn, analysisLocale});
+  const mock = analyzeHypothesisMock({title, text: rawText, analysisLocale});
 
   const hypothesis = await prisma.hypothesis.create({
     data: {
@@ -124,23 +129,26 @@ export async function createHypothesisAction(locale: string, formData: FormData)
 export async function startBreakthroughAction(locale: string, conditionId: string) {
   const condition = await prisma.hypothesisCondition.findUnique({include: {hypothesis: true}, where: {id: conditionId}});
   if (!condition) return;
+  const localized = localizeMockValue(condition, locale);
   const session = await prisma.breakthroughSession.create({
     data: {
       projectId: condition.hypothesis.projectId,
       hypothesisId: condition.hypothesisId,
       conditionId: condition.id,
-      title: condition.title,
-      problemStatement: condition.description,
-      whyItMatters: `This condition is marked ${condition.importance} for the hypothesis to work.`,
-      ifSolvedImpact: jsonValueOrObject(condition.ifSolvedImpactJson),
-      knownState: {knownWhat: condition.knownWhat} as Prisma.InputJsonValue,
-      missingPieces: {unknownWhat: condition.unknownWhat, requiredEvidence: condition.requiredEvidence} as Prisma.InputJsonValue,
-      blockers: jsonValueOrObject(condition.blockers),
-      conflicts: jsonValueOrObject(condition.conflicts),
-      possiblePaths: jsonValueOrObject(condition.possibleWorkarounds),
-      currentBestPath: condition.testMethod,
+      title: localized.title,
+      problemStatement: localized.description,
+      whyItMatters: locale === 'ru'
+        ? `Это условие имеет уровень «${getConditionImportanceLabel(condition.importance, locale)}» и необходимо для работоспособности гипотезы.`
+        : `This condition is marked ${getConditionImportanceLabel(condition.importance, locale)} and is required for the hypothesis to work.`,
+      ifSolvedImpact: jsonValueOrObject(localizeMockValue(condition.ifSolvedImpactJson, locale)),
+      knownState: (locale === 'ru' ? {известно: localized.knownWhat} : {known: localized.knownWhat}) as Prisma.InputJsonValue,
+      missingPieces: (locale === 'ru' ? {неизвестно: localized.unknownWhat, необходимые_данные: localized.requiredEvidence} : {unknown: localized.unknownWhat, requiredEvidence: localized.requiredEvidence}) as Prisma.InputJsonValue,
+      blockers: jsonValueOrObject(localizeMockValue(condition.blockers, locale)),
+      conflicts: jsonValueOrObject(localizeMockValue(condition.conflicts, locale)),
+      possiblePaths: jsonValueOrObject(localizeMockValue(condition.possibleWorkarounds, locale)),
+      currentBestPath: localized.testMethod,
       progressScore: condition.completionScore,
-      events: {create: {type: 'STATUS_CHANGED', content: {message: 'Breakthrough session started'} as Prisma.InputJsonValue}}
+      events: {create: {type: 'STATUS_CHANGED', content: {message: locale === 'ru' ? 'Сессия поиска прорыва начата.' : 'Breakthrough session started.'} as Prisma.InputJsonValue}}
     }
   });
   redirect(`/${locale}/breakthroughs/${session.id}`);

@@ -28,7 +28,8 @@
     "heroText": "TheoryForge transforms wild scientific and engineering hypotheses into condition maps, blockers, progress scores, experiments and breakthrough paths.",
     "cta": "Start Research",
     "secondary": "View Demo Lab",
-    "principle": "AI does not invent the breakthrough for you. It helps you think, model, calculate and test faster."
+    "principle": "AI does not invent the breakthrough for you. It helps you think, model, calculate and test faster.",
+    "labLabel": "AI Research Laboratory"
   },
   "dashboard": {
     "title": "Research Dashboard",
@@ -57,6 +58,11 @@
     "realityGap": "Reality Gap",
     "mainBlockers": "Main Blockers",
     "nextBestAction": "Next Best Action",
+    "nextBestActionValue": "Reduce the hypothesis to the smallest testable version",
+    "technicalModel": "Technical model",
+    "technicalModelHelp": "Internal structured model used by the simulator. This is not the final scientific answer.",
+    "target": "Target object",
+    "confidence": "model confidence",
     "tabs": {
       "overview": "Overview",
       "model": "Model",
@@ -93,7 +99,12 @@
     "suggestedNext": "Suggested next action",
     "impact": "Progress impact",
     "newBlockers": "New blockers",
-    "reducedBlockers": "Reduced blockers"
+    "reducedBlockers": "Reduced blockers",
+    "conditionProgress": "Condition progress",
+    "aiReview": "AI diagnostic review",
+    "calculationChecks": "Calculation checks",
+    "addNote": "Add note",
+    "notePlaceholder": "Add research note"
   },
   "visual": {
     "objects": "Objects",
@@ -107,12 +118,22 @@
     "equipment": "Required equipment",
     "signal": "Expected signal",
     "falsification": "Falsification criteria",
-    "safety": "Safety"
+    "safety": "Safety",
+    "difficulty": "Difficulty"
   },
   "settings": {
     "title": "Settings",
     "preferredLanguage": "Preferred language",
     "privacy": "Privacy placeholder"
+  },
+  "labels": {
+    "PHYSICALLY_POSSIBLE_ENGINEERING_BLOCKED": "Physically possible, engineering blocked",
+    "NEEDS_BREAKTHROUGH": "Needs breakthrough",
+    "TESTABLE": "Testable",
+    "ENGINEERING_BLOCKED": "Engineering blocker",
+    "CRITICAL": "Critical",
+    "HIGH": "High importance",
+    "EXTREME": "Extreme gap"
   },
   "admin": {
     "title": "Analysis Prompts",

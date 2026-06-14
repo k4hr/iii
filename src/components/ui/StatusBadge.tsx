@@ -2,7 +2,7 @@ const criticalTerms = ['CRITICAL', 'EXTREME', 'BLOCKED', 'CONFLICT', 'DANGEROUS'
 const positiveTerms = ['ACTIVE', 'TESTABLE', 'WORKING', 'POSSIBLE', 'READY', 'PROMISING', 'SAFE'];
 const warningTerms = ['HIGH', 'CAUTION', 'REVIEW', 'UNKNOWN', 'LIMITED', 'MATH', 'EXPERIMENT'];
 
-export function StatusBadge({value, label}: {value: string; label?: string}) {
+export function StatusBadge({value, label, locale = 'en'}: {value: string; label?: string; locale?: string}) {
   const normalized = value.toUpperCase();
   const tone = criticalTerms.some(term => normalized.includes(term))
     ? 'critical'
@@ -15,7 +15,8 @@ export function StatusBadge({value, label}: {value: string; label?: string}) {
   return (
     <span className={`status-badge status-badge--${tone}`}>
       <span className="status-badge__dot" />
-      {label ?? value.replaceAll('_', ' ')}
+      {label ?? getEnumLabel(value, locale)}
     </span>
   );
 }
+import {getEnumLabel} from '@/lib/locale/enum-labels';

@@ -5,6 +5,7 @@ import {GlassPanel} from '@/components/ui/GlassPanel';
 import {GlowButton} from '@/components/ui/GlowButton';
 import {LabMetricCard} from '@/components/ui/LabMetricCard';
 import {StatusBadge} from '@/components/ui/StatusBadge';
+import {getEnumLabel} from '@/lib/locale/enum-labels';
 
 export default async function Dashboard({params}: {params: Promise<{locale: string}>}) {
   const {locale} = await params;
@@ -16,12 +17,13 @@ export default async function Dashboard({params}: {params: Promise<{locale: stri
     prisma.breakthroughSession.findMany({take: 3, orderBy: {createdAt: 'desc'}, include: {hypothesis: true}}),
   ]);
   const avg = hypotheses[0]?.analyses[0] || {researchProgress: 0, functionalityProgress: 0, testabilityProgress: 0};
+  const ru = locale === 'ru';
 
   return (
     <div className="space-y-10 py-3">
       <header className="flex flex-col justify-between gap-6 border-b border-cyan-100/[0.08] pb-8 md:flex-row md:items-end">
         <div>
-          <div className="section-kicker">Research control center</div>
+          <div className="section-kicker">{ru ? 'Центр управления исследованиями' : 'Research control center'}</div>
           <h1 className="section-heading mt-4">{t('title')}</h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-[#78999b]">{t('subtitle')}</p>
         </div>
@@ -33,24 +35,24 @@ export default async function Dashboard({params}: {params: Promise<{locale: stri
 
       <section>
         <div className="mb-4 flex items-center justify-between">
-          <span className="mono-label">Live model telemetry</span>
-          <StatusBadge value="ACTIVE" label="Analysis feed" />
+          <span className="mono-label">{ru ? 'Телеметрия модели' : 'Live model telemetry'}</span>
+          <StatusBadge value="ACTIVE" locale={locale} label={ru ? 'Поток анализа' : 'Analysis feed'} />
         </div>
         <GlassPanel glow className="data-grid grid gap-3 p-3 md:grid-cols-3">
-          <LabMetricCard label={t('research')} value={avg.researchProgress} detail="Evidence coverage and model definition" />
-          <LabMetricCard label={t('functionality')} value={avg.functionalityProgress} detail="Distance from modeled effect to usable system" />
-          <LabMetricCard label={t('testability')} value={avg.testabilityProgress} detail="Readiness for measurable falsification" />
+          <LabMetricCard label={t('research')} value={avg.researchProgress} detail={ru ? 'Полнота доказательств и определения модели' : 'Evidence coverage and model definition'} />
+          <LabMetricCard label={t('functionality')} value={avg.functionalityProgress} detail={ru ? 'Расстояние от модели до работающей системы' : 'Distance from modeled effect to usable system'} />
+          <LabMetricCard label={t('testability')} value={avg.testabilityProgress} detail={ru ? 'Готовность к измеримому опровержению' : 'Readiness for measurable falsification'} />
         </GlassPanel>
       </section>
 
-      <DashboardGrid title={t('recentProjects')} index="01" items={projects.map(project => ({title: project.title, href: `/${locale}/projects/${project.id}`, meta: project.description || ''}))} />
-      <DashboardGrid title={t('recentHypotheses')} index="02" items={hypotheses.map(hypothesis => ({title: hypothesis.originalTitle, href: `/${locale}/hypotheses/${hypothesis.id}`, meta: hypothesis.status}))} />
-      <DashboardGrid title={t('activeBreakthroughs')} index="03" items={sessions.map(session => ({title: session.title, href: `/${locale}/breakthroughs/${session.id}`, meta: session.hypothesis.originalTitle, status: session.status}))} />
+      <DashboardGrid locale={locale} title={t('recentProjects')} index="01" items={projects.map(project => ({title: project.title, href: `/${locale}/projects/${project.id}`, meta: project.description || ''}))} />
+      <DashboardGrid locale={locale} title={t('recentHypotheses')} index="02" items={hypotheses.map(hypothesis => ({title: hypothesis.originalTitle, href: `/${locale}/hypotheses/${hypothesis.id}`, meta: getEnumLabel(hypothesis.status, locale)}))} />
+      <DashboardGrid locale={locale} title={t('activeBreakthroughs')} index="03" items={sessions.map(session => ({title: session.title, href: `/${locale}/breakthroughs/${session.id}`, meta: session.hypothesis.originalTitle, status: session.status}))} />
     </div>
   );
 }
 
-function DashboardGrid({title, index, items}: {title: string; index: string; items: {title: string; href: string; meta: string; status?: string}[]}) {
+function DashboardGrid({title, index, items, locale}: {title: string; index: string; locale: string; items: {title: string; href: string; meta: string; status?: string}[]}) {
   return (
     <section>
       <div className="mb-4 flex items-center gap-4">
@@ -63,15 +65,15 @@ function DashboardGrid({title, index, items}: {title: string; index: string; ite
           <Link href={item.href} key={item.href} className="group">
             <GlassPanel className="h-full min-h-36 p-5 transition duration-300 group-hover:-translate-y-1 group-hover:border-cyan-200/25">
               <div className="flex items-start justify-between gap-4">
-                <span className="mono-label">Research node</span>
-                {item.status && <StatusBadge value={item.status} />}
+                <span className="mono-label">{locale === 'ru' ? 'Исследовательский узел' : 'Research node'}</span>
+                {item.status && <StatusBadge value={item.status} locale={locale} />}
               </div>
               <h3 className="mt-7 font-semibold text-cyan-50 transition group-hover:text-[#7cf8e8]">{item.title}</h3>
               <p className="mt-2 line-clamp-2 text-xs leading-5 text-[#668789]">{item.meta}</p>
             </GlassPanel>
           </Link>
         )) : (
-          <GlassPanel className="p-5 text-sm text-[#668789]">No research nodes yet.</GlassPanel>
+          <GlassPanel className="p-5 text-sm text-[#668789]">{locale === 'ru' ? 'Исследовательских узлов пока нет.' : 'No research nodes yet.'}</GlassPanel>
         )}
       </div>
     </section>

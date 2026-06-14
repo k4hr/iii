@@ -2,6 +2,7 @@ import {startBreakthroughAction} from '@/server/actions/hypotheses';
 import {GlowButton} from '@/components/ui/GlowButton';
 import {ProgressBar} from '@/components/ui/ProgressBar';
 import {StatusBadge} from '@/components/ui/StatusBadge';
+import {getConditionImportanceLabel, getConditionStatusLabel} from '@/lib/locale/enum-labels';
 
 export function ConditionCard({condition, locale, labels, index = 0}: {condition: any; locale: string; labels: Record<string, string>; index?: number}) {
   return (
@@ -17,9 +18,9 @@ export function ConditionCard({condition, locale, labels, index = 0}: {condition
             </div>
           </div>
           <div className="flex flex-wrap gap-2 xl:justify-end">
-            <StatusBadge value={condition.status} />
-            <StatusBadge value={condition.importance} />
-            <span className="status-badge status-badge--neutral">{Math.round(condition.confidence)}% confidence</span>
+            <StatusBadge value={condition.status} locale={locale} label={getConditionStatusLabel(condition.status, locale)} />
+            <StatusBadge value={condition.importance} locale={locale} label={getConditionImportanceLabel(condition.importance, locale)} />
+            <span className="status-badge status-badge--neutral">{Math.round(condition.confidence)}% {locale === 'ru' ? 'уверенности' : 'confidence'}</span>
           </div>
         </div>
       </summary>

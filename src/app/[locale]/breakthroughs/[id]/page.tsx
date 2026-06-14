@@ -5,6 +5,9 @@ import {GlassPanel} from '@/components/ui/GlassPanel';
 import {GlowButton} from '@/components/ui/GlowButton';
 import {ProgressRing} from '@/components/ui/ProgressRing';
 import {StatusBadge} from '@/components/ui/StatusBadge';
+import {evaluateBreakthroughIdea} from '@/lib/ai/evaluate-breakthrough-idea';
+import {localizeMockValue} from '@/lib/locale/mock-copy';
+import {getBreakthroughStatusLabel, getConditionImportanceLabel, getIdeaStatusLabel} from '@/lib/locale/enum-labels';
 
 export default async function BreakthroughPage({params}: {params: Promise<{locale: string; id: string}>}) {
   const {locale, id} = await params;
@@ -15,34 +18,42 @@ export default async function BreakthroughPage({params}: {params: Promise<{local
   });
 
   if (!session) return <div>Not found</div>;
+  const ru = locale === 'ru';
+  const condition = localizeMockValue(session.condition, locale);
+  const ideas = session.ideas.map(idea => ({...idea, ...evaluateBreakthroughIdea(idea.rawText, locale), checks: localizeMockValue(idea.checks, locale)}));
+  const whyItMatters = ru
+    ? `Это условие имеет уровень «${getConditionImportanceLabel(session.condition.importance, locale)}» и необходимо для работоспособности гипотезы.`
+    : `This condition is marked ${getConditionImportanceLabel(session.condition.importance, locale)} and is required for the hypothesis to work.`;
+  const knownState = ru ? {известно: condition.knownWhat} : {known: condition.knownWhat};
+  const missingPieces = ru ? {неизвестно: condition.unknownWhat, необходимые_данные: condition.requiredEvidence} : {unknown: condition.unknownWhat, requiredEvidence: condition.requiredEvidence};
 
   return (
     <div className="space-y-10 py-3">
       <GlassPanel glow className="data-grid grid gap-8 p-6 sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center">
         <div>
-          <div className="flex flex-wrap items-center gap-2"><StatusBadge value={session.status} /><span className="mono-label">{t('title')}</span></div>
-          <h1 className="mt-5 max-w-4xl text-4xl font-semibold tracking-[-.045em] text-white sm:text-5xl">{session.title}</h1>
-          <p className="mt-5 max-w-4xl text-sm leading-7 text-[#91adaf]">{session.problemStatement}</p>
+          <div className="flex flex-wrap items-center gap-2"><StatusBadge value={session.status} locale={locale} label={getBreakthroughStatusLabel(session.status, locale)} /><span className="mono-label">{t('title')}</span></div>
+          <h1 className="mt-5 max-w-4xl text-4xl font-semibold tracking-[-.045em] text-white sm:text-5xl">{condition.title}</h1>
+          <p className="mt-5 max-w-4xl text-sm leading-7 text-[#91adaf]">{condition.description}</p>
           <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-[10px] tracking-[.1em] text-cyan-100/35 uppercase">
-            <span>Hypothesis: {session.hypothesis.originalTitle}</span>
-            <span>Condition: {session.condition.importance}</span>
-            <span>Ideas: {session.ideas.length}</span>
+            <span>{ru ? 'Гипотеза' : 'Hypothesis'}: {session.hypothesis.originalTitle}</span>
+            <span>{ru ? 'Условие' : 'Condition'}: {getConditionImportanceLabel(session.condition.importance, locale)}</span>
+            <span>{ru ? 'Идеи' : 'Ideas'}: {ideas.length}</span>
           </div>
         </div>
         <div className="flex justify-center border-cyan-100/[0.08] lg:border-l lg:pl-10">
-          <ProgressRing value={session.progressScore} label="Condition progress" size={164} />
+          <ProgressRing value={session.progressScore} label={t('conditionProgress')} size={164} />
         </div>
       </GlassPanel>
 
       <section>
-        <CockpitHeader code="CTX-01" title={t('problem')} status="Context loaded" />
+        <CockpitHeader code="CTX-01" title={t('problem')} status={ru ? 'Контекст загружен' : 'Context loaded'} />
         <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          <DiagnosticPanel title={t('why')} data={session.whyItMatters} />
-          <DiagnosticPanel title={t('ifSolved')} data={session.ifSolvedImpact} tone="positive" />
-          <DiagnosticPanel title={t('known')} data={session.knownState} />
-          <DiagnosticPanel title={t('missing')} data={session.missingPieces} tone="warning" />
-          <DiagnosticPanel title={t('paths')} data={session.possiblePaths} tone="positive" />
-          <DiagnosticPanel title={t('bestPath')} data={session.currentBestPath} />
+          <DiagnosticPanel title={t('why')} data={whyItMatters} />
+          <DiagnosticPanel title={t('ifSolved')} data={condition.ifSolvedImpactJson} tone="positive" />
+          <DiagnosticPanel title={t('known')} data={knownState} />
+          <DiagnosticPanel title={t('missing')} data={missingPieces} tone="warning" />
+          <DiagnosticPanel title={t('paths')} data={condition.possibleWorkarounds} tone="positive" />
+          <DiagnosticPanel title={t('bestPath')} data={condition.testMethod} />
         </div>
       </section>
 
@@ -53,7 +64,7 @@ export default async function BreakthroughPage({params}: {params: Promise<{local
             <span className="h-2 w-2 rounded-full bg-amber-300/70" />
             <span className="h-2 w-2 rounded-full bg-emerald-300/70" />
           </div>
-          <span className="font-mono text-[9px] tracking-[.15em] text-cyan-200/35">THEORY INPUT CONSOLE</span>
+          <span className="font-mono text-[9px] tracking-[.15em] text-cyan-200/35">{ru ? 'КОНСОЛЬ ВВОДА ТЕОРИИ' : 'THEORY INPUT CONSOLE'}</span>
         </div>
         <form action={addIdeaAction.bind(null, locale, session.id)} className="p-5 sm:p-7">
           <label className="section-kicker" htmlFor="rawText">{t('yourTheory')}</label>
@@ -62,29 +73,29 @@ export default async function BreakthroughPage({params}: {params: Promise<{local
             <textarea id="rawText" className="lab-input terminal-text min-h-40 resize-y pt-12 text-sm leading-7" name="rawText" placeholder={t('yourTheoryPlaceholder')} required />
           </div>
           <div className="mt-4 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-            <p className="font-mono text-[9px] tracking-[.1em] text-[#527376] uppercase">Input is evaluated against physics, engineering constraints and testability.</p>
+            <p className="font-mono text-[9px] tracking-[.1em] text-[#527376] uppercase">{ru ? 'Идея проверяется по физическим и инженерным ограничениям и критериям проверяемости.' : 'Input is evaluated against physics, engineering constraints and testability.'}</p>
             <GlowButton>{t('checkIdea')}</GlowButton>
           </div>
         </form>
       </GlassPanel>
 
       <section>
-        <CockpitHeader code="BRN-02" title={t('ideas')} status={`${session.ideas.length} diagnostic branches`} />
+        <CockpitHeader code="BRN-02" title={t('ideas')} status={`${ideas.length} ${ru ? 'диагностических ветвей' : 'diagnostic branches'}`} />
         <div className="mt-5 space-y-4">
-          {session.ideas.map((idea, index) => (
+          {ideas.map((idea, index) => (
             <GlassPanel className="p-5 sm:p-6" key={idea.id}>
               <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
                 <div className="flex gap-4">
-                  <span className="font-mono text-[10px] tracking-[.14em] text-cyan-200/35">IDEA {String(index + 1).padStart(2, '0')}</span>
+                  <span className="font-mono text-[10px] tracking-[.14em] text-cyan-200/35">{ru ? 'ИДЕЯ' : 'IDEA'} {String(index + 1).padStart(2, '0')}</span>
                   <div><h3 className="font-semibold text-cyan-50">{idea.title}</h3><p className="mt-2 max-w-4xl text-sm leading-6 text-[#91adaf]">{idea.formalizedText}</p></div>
                 </div>
-                <div className="flex flex-wrap gap-2"><StatusBadge value={idea.status} /><StatusBadge value={idea.authorType} /></div>
+                <div className="flex flex-wrap gap-2"><StatusBadge value={idea.status} locale={locale} label={getIdeaStatusLabel(idea.status, locale)} /><StatusBadge value={idea.authorType} locale={locale} /></div>
               </div>
               <div className="mt-6 grid gap-3 border-t border-cyan-100/[0.07] pt-5 md:grid-cols-2 xl:grid-cols-4">
                 <DiagnosticPanel title={t('impact')} data={idea.impactJson} tone="positive" compact />
                 <DiagnosticPanel title={t('newBlockers')} data={idea.newBlockersJson} tone="critical" compact />
-                <DiagnosticPanel title="AI diagnostic review" data={idea.reviewJson} compact />
-                <DiagnosticPanel title="Calculation checks" data={idea.checks.map(check => check.resultJson)} compact />
+                <DiagnosticPanel title={t('aiReview')} data={idea.reviewJson} compact />
+                <DiagnosticPanel title={t('calculationChecks')} data={idea.checks.map(check => check.resultJson)} compact />
               </div>
             </GlassPanel>
           ))}
@@ -92,17 +103,17 @@ export default async function BreakthroughPage({params}: {params: Promise<{local
       </section>
 
       <GlassPanel className="p-5 sm:p-6">
-        <CockpitHeader code="LOG-03" title={t('labLog')} status={`${session.events.length} events`} />
+        <CockpitHeader code="LOG-03" title={t('labLog')} status={`${session.events.length} ${ru ? 'событий' : 'events'}`} />
         <form action={addUserNoteAction.bind(null, locale, session.id)} className="mt-5 flex flex-col gap-3 sm:flex-row">
-          <input className="lab-input" name="note" placeholder="Add research note" />
-          <GlowButton variant="secondary">Add note</GlowButton>
+          <input className="lab-input" name="note" placeholder={t('notePlaceholder')} />
+          <GlowButton variant="secondary">{t('addNote')}</GlowButton>
         </form>
         <div className="relative mt-6 space-y-3 border-l border-cyan-200/15 pl-6">
           {session.events.map((event, index) => (
             <div className="relative rounded-xl border border-cyan-100/[0.07] bg-black/30 p-4" key={event.id}>
               <span className="absolute -left-[1.72rem] top-5 h-2.5 w-2.5 rounded-full border-2 border-[#071315] bg-cyan-300 shadow-[0_0_10px_#43f1df]" />
-              <div className="flex flex-wrap items-center justify-between gap-3"><StatusBadge value={event.type} /><span className="font-mono text-[9px] text-cyan-100/25">EVENT {String(session.events.length - index).padStart(3, '0')}</span></div>
-              <div className="terminal-text mt-3 text-xs leading-5 text-[#78999b]">{formatDiagnostic(event.content)}</div>
+              <div className="flex flex-wrap items-center justify-between gap-3"><StatusBadge value={event.type} locale={locale} /><span className="font-mono text-[9px] text-cyan-100/25">{ru ? 'СОБЫТИЕ' : 'EVENT'} {String(session.events.length - index).padStart(3, '0')}</span></div>
+              <div className="terminal-text mt-3 text-xs leading-5 text-[#78999b]">{formatDiagnostic(localizeMockValue(event.content, locale))}</div>
             </div>
           ))}
         </div>

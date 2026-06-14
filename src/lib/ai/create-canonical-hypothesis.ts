@@ -1,11 +1,9 @@
 import {Locale} from '@prisma/client';
 
 export function createCanonicalHypothesis(input: {title: string; text: string; locale: Locale}) {
-  if (input.locale === Locale.EN) {
-    return {canonicalTitleEn: input.title, canonicalTextEn: input.text};
-  }
+  // Keep the original text internally until a verified translation step is available.
   return {
-    canonicalTitleEn: `Canonical scientific claim: ${input.title}`,
-    canonicalTextEn: `Canonical English version for analysis: ${input.text}`
+    canonicalTitleEn: input.title,
+    canonicalTextEn: input.text,
   };
 }

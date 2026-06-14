@@ -1,5 +1,6 @@
 import {ConditionImportance, ConditionStatus} from '@prisma/client';
 import {calculateProgress} from './progress-calculator';
+import {localizeMockValue, MockLocale} from '@/lib/locale/mock-copy';
 
 export type MockCondition = {
   title: string;
@@ -19,11 +20,14 @@ export type MockCondition = {
   progressImpactJson: Record<string, unknown>;
 };
 
-export function generateConditionTree(text: string): MockCondition[] {
+export function generateConditionTree(text: string, locale: MockLocale = 'en'): MockCondition[] {
   const lower = text.toLowerCase();
-  if (/time|врем|spacetime|field|поле|quantum/.test(lower)) return timeConditions();
-  if (/battery|лит|lithium|energy|power|батар|энерг/.test(lower)) return batteryConditions();
-  return genericConditions();
+  const conditions = /time|врем|spacetime|field|поле|quantum/.test(lower)
+    ? timeConditions()
+    : /battery|лит|lithium|energy|power|батар|энерг/.test(lower)
+      ? batteryConditions()
+      : genericConditions();
+  return localizeMockValue(conditions, locale);
 }
 
 function timeConditions(): MockCondition[] {

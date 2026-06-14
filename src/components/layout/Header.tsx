@@ -4,6 +4,7 @@ import {locales} from '@/i18n/routing';
 
 export function Header({locale}: {locale: string}) {
   const t = useTranslations('common');
+  const ru = locale === 'ru';
 
   return (
     <header className="sticky top-0 z-40 border-b border-cyan-100/[0.08] bg-[#020607]/75 backdrop-blur-2xl">
@@ -15,7 +16,7 @@ export function Header({locale}: {locale: string}) {
           </span>
           <span>
             <span className="block text-sm font-semibold tracking-[.16em] text-cyan-50 uppercase">{t('appName')}</span>
-            <span className="hidden text-[9px] tracking-[.19em] text-cyan-100/35 uppercase sm:block">Research Intelligence System</span>
+            <span className="hidden text-[9px] tracking-[.19em] text-cyan-100/35 uppercase sm:block">{ru ? 'Система исследовательского анализа' : 'Research Intelligence System'}</span>
           </span>
         </Link>
 
@@ -29,7 +30,7 @@ export function Header({locale}: {locale: string}) {
         <div className="flex items-center gap-2">
           <span className="hidden items-center gap-2 text-[9px] tracking-[.12em] text-emerald-300/70 uppercase lg:flex">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-300 shadow-[0_0_9px_#6ee7b7]" />
-            Systems online
+            {ru ? 'Системы активны' : 'Systems online'}
           </span>
           <div className="ml-2 flex rounded-lg border border-white/[0.06] bg-black/30 p-1">
             {locales.slice(0, 2).map(language => (
