@@ -4,13 +4,16 @@ import {ProgressPanel} from '@/components/hypotheses/ProgressPanel';
 import {ConditionCard} from '@/components/hypotheses/ConditionCard';
 import {VisualSceneCards} from '@/components/visual-lab/VisualSceneCards';
 import {CalculationCard} from '@/components/calculations/CalculationCard';
+import {SourceCandidateCard} from '@/components/sources/SourceCandidateCard';
 import {GlassPanel} from '@/components/ui/GlassPanel';
 import {GlowButton} from '@/components/ui/GlowButton';
 import {StatusBadge} from '@/components/ui/StatusBadge';
-import {createMockAnalysisTranslation, createMockSources} from '@/lib/ai/analyze-hypothesis';
+import {createMockAnalysisTranslation} from '@/lib/ai/analyze-hypothesis';
 import {localizeMockValue} from '@/lib/locale/mock-copy';
-import {getEnumLabel, getExperimentDifficultyLabel, getExperimentTypeLabel, getSafetyLevelLabel, getSourceRelationshipLabel, getVerdictLevelLabel} from '@/lib/locale/enum-labels';
+import {getEnumLabel, getExperimentDifficultyLabel, getExperimentTypeLabel, getSafetyLevelLabel, getVerdictLevelLabel} from '@/lib/locale/enum-labels';
+import {getLocalizedSourceSummary} from '@/lib/sources/source-discovery';
 import {runCalculationAction} from '@/server/actions/calculations';
+import {discoverSourcesAction} from '@/server/actions/sources';
 
 export default async function HypothesisPage({params}: {params: Promise<{locale: string; id: string}>}) {
   const {locale, id} = await params;
@@ -19,6 +22,7 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
   const e = await getTranslations('experiments');
   const c = await getTranslations('common');
   const calc = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'calculations'});
+  const sourceT = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'sources'});
   const hypothesis = await prisma.hypothesis.findUnique({
     where: {id},
     include: {
@@ -26,7 +30,7 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
       conditions: {orderBy: [{importance: 'asc'}, {createdAt: 'asc'}]},
       visualScenes: {take: 1, orderBy: {createdAt: 'desc'}},
       experiments: true,
-      sources: true,
+      sources: {orderBy: {createdAt: 'desc'}},
       versions: true,
       simulationRuns: true,
       calculationRuns: {orderBy: {createdAt: 'desc'}, include: {condition: true}},
@@ -39,7 +43,7 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
   const conditions = hypothesis.conditions.map(condition => localizeMockValue(condition, locale));
   const experiments = hypothesis.experiments.map(experiment => localizeMockValue(experiment, locale));
   const visualScene = hypothesis.visualScenes[0] ? localizeMockValue(hypothesis.visualScenes[0], locale) : null;
-  const sources = createMockSources(locale);
+  const sources = hypothesis.sources.map(source => ({...source, summary: getLocalizedSourceSummary(source, locale)}));
   const blockers = conditions.filter(condition => condition.importance === 'CRITICAL').map(condition => condition.title).slice(0, 3);
   const labels = {progress: c('progress'), known: t('known'), unknown: t('unknown'), blockers: t('blockers'), conflicts: t('conflicts'), ifSolved: t('ifSolved'), testMethod: t('testMethod'), start: c('startBreakthrough')};
   const minimalExperiments = Array.isArray(translation?.minimalExperiments) ? translation.minimalExperiments : [];
@@ -167,10 +171,19 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
       </section>
 
       <section>
-        <SectionHeader code="SRC-04" title={t('tabs.sources')} detail={`${sources.length} ${locale === 'ru' ? 'источника' : 'sources'}`} />
-        <div className="mt-5 grid gap-4 md:grid-cols-2">
-          {sources.map(source => <GlassPanel className="p-5" key={source.title}><StatusBadge value={source.relationshipToHypothesis} locale={locale} label={getSourceRelationshipLabel(source.relationshipToHypothesis, locale)} /><h3 className="mt-4 font-semibold text-cyan-50">{source.title}</h3><p className="mt-2 text-xs leading-5 text-[#78999b]">{source.summary}</p></GlassPanel>)}
+        <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+          <div><div className="mono-label">SRC-04</div><h2 className="section-heading mt-2">{sourceT('title')}</h2><p className="mt-3 max-w-3xl text-xs leading-6 text-[#78999b]">{sourceT('description')}</p></div>
+          <form action={discoverSourcesAction.bind(null, locale, hypothesis.id, undefined)}>
+            <GlowButton>{sourceT('discover')}</GlowButton>
+          </form>
         </div>
+        {sources.length ? (
+          <div className="mt-5 grid gap-4 md:grid-cols-2">
+            {sources.map(source => <SourceCandidateCard source={source} summary={source.summary} locale={locale} labels={{candidate: sourceT('candidate'), openSearch: sourceT('openSearch')}} key={source.id} />)}
+          </div>
+        ) : (
+          <p className="mt-5 rounded-xl border border-dashed border-cyan-100/[0.1] px-5 py-4 text-xs text-[#78999b]">{sourceT('empty')}</p>
+        )}
       </section>
 
       <section className="grid gap-4 md:grid-cols-3">

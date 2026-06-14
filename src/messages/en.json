@@ -136,6 +136,16 @@
     "preliminary": "Preliminary estimate",
     "history": "calculation runs"
   },
+  "sources": {
+    "title": "Scientific Sources",
+    "description": "Structured research directions and scholarly search queries. Candidates must be verified before they are treated as evidence.",
+    "discover": "Discover sources",
+    "discoverBlocker": "Find sources for this blocker",
+    "candidate": "Source candidate to verify",
+    "openSearch": "Open scholarly search",
+    "empty": "No source candidates have been added yet.",
+    "count": "source candidates"
+  },
   "settings": {
     "title": "Settings",
     "preferredLanguage": "Preferred language",

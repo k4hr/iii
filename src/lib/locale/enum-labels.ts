@@ -89,18 +89,24 @@ const enLabels: Record<string, string> = {
   SOLVED_EXPERIMENTALLY: 'Solved experimentally',
 };
 
-export function isRussianLocale(locale: string) {
-  return locale.toLowerCase() === 'ru';
+export function isRussianLocale(locale?: string | null) {
+  return locale?.toLowerCase() === 'ru';
 }
 
-export function getEnumLabel(value: string, locale: string) {
+export function humanizeEnum(value?: string | null) {
+  if (!value) return '—';
+  return value.replaceAll('_', ' ').toLowerCase().replace(/^./, character => character.toUpperCase());
+}
+
+export function getEnumLabel(value?: string | null, locale?: string | null) {
   const labels = isRussianLocale(locale) ? ruLabels : enLabels;
-  return labels[value] ?? value.replaceAll('_', ' ').toLowerCase().replace(/^./, character => character.toUpperCase());
+  return value ? labels[value] ?? humanizeEnum(value) : humanizeEnum(value);
 }
 
 type LabelMap = Record<string, string>;
 
-function scopedLabel(value: string, locale: string, russian: LabelMap, english: LabelMap = {}) {
+function scopedLabel(value: string | null | undefined, locale: string | null | undefined, russian: LabelMap, english: LabelMap = {}) {
+  if (!value) return humanizeEnum(value);
   if (isRussianLocale(locale)) return russian[value] ?? getEnumLabel(value, locale);
   return english[value] ?? getEnumLabel(value, locale);
 }

@@ -2,8 +2,8 @@ const criticalTerms = ['CRITICAL', 'EXTREME', 'BLOCKED', 'CONFLICT', 'DANGEROUS'
 const positiveTerms = ['ACTIVE', 'TESTABLE', 'WORKING', 'POSSIBLE', 'READY', 'PROMISING', 'SAFE'];
 const warningTerms = ['HIGH', 'CAUTION', 'REVIEW', 'UNKNOWN', 'LIMITED', 'MATH', 'EXPERIMENT'];
 
-export function StatusBadge({value, label, locale = 'en'}: {value: string; label?: string; locale?: string}) {
-  const normalized = value.toUpperCase();
+export function StatusBadge({value, label, locale = 'en'}: {value?: string | null; label?: string; locale?: string}) {
+  const normalized = value?.toUpperCase() ?? '';
   const tone = criticalTerms.some(term => normalized.includes(term))
     ? 'critical'
     : positiveTerms.some(term => normalized.includes(term))

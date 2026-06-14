@@ -305,6 +305,7 @@ model HypothesisCondition {
   experiments           ExperimentProposal[]
   breakthroughSessions  BreakthroughSession[]
   calculationRuns       CalculationRun[]
+  sourceReferences      SourceReference[]
 }
 
 model VisualScene {
@@ -355,12 +356,16 @@ model SourceReference {
   id                       String @id @default(cuid())
   hypothesisId              String
   hypothesis                Hypothesis @relation(fields: [hypothesisId], references: [id], onDelete: Cascade)
+  conditionId               String?
+  condition                 HypothesisCondition? @relation(fields: [conditionId], references: [id], onDelete: SetNull)
   title                     String
   url                       String?
   sourceType                SourceType
   relationshipToHypothesis  SourceRelationship
   summary                   String
   createdAt                 DateTime @default(now())
+
+  @@index([conditionId])
 }
 
 model BreakthroughSession {

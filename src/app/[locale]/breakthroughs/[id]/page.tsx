@@ -2,22 +2,26 @@ import {getTranslations} from 'next-intl/server';
 import {prisma} from '@/lib/db/prisma';
 import {addIdeaAction, addUserNoteAction} from '@/server/actions/breakthroughs';
 import {runCalculationAction} from '@/server/actions/calculations';
+import {discoverSourcesAction} from '@/server/actions/sources';
 import {CalculationCard} from '@/components/calculations/CalculationCard';
+import {SourceCandidateCard} from '@/components/sources/SourceCandidateCard';
 import {GlassPanel} from '@/components/ui/GlassPanel';
 import {GlowButton} from '@/components/ui/GlowButton';
 import {ProgressRing} from '@/components/ui/ProgressRing';
 import {StatusBadge} from '@/components/ui/StatusBadge';
 import {evaluateBreakthroughIdea} from '@/lib/ai/evaluate-breakthrough-idea';
 import {localizeMockValue} from '@/lib/locale/mock-copy';
-import {getBreakthroughStatusLabel, getConditionImportanceLabel, getIdeaStatusLabel} from '@/lib/locale/enum-labels';
+import {getBreakthroughStatusLabel, getConditionImportanceLabel, getIdeaStatusLabel, humanizeEnum} from '@/lib/locale/enum-labels';
+import {getLocalizedSourceSummary} from '@/lib/sources/source-discovery';
 
 export default async function BreakthroughPage({params}: {params: Promise<{locale: string; id: string}>}) {
   const {locale, id} = await params;
   const t = await getTranslations('breakthrough');
   const calc = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'calculations'});
+  const sourceT = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'sources'});
   const session = await prisma.breakthroughSession.findUnique({
     where: {id},
-    include: {condition: true, hypothesis: true, ideas: {orderBy: {createdAt: 'desc'}, include: {checks: true}}, events: {orderBy: {createdAt: 'desc'}}, calculationRuns: {orderBy: {createdAt: 'desc'}}},
+    include: {condition: {include: {sourceReferences: {orderBy: {createdAt: 'desc'}}}}, hypothesis: true, ideas: {orderBy: {createdAt: 'desc'}, include: {checks: true}}, events: {orderBy: {createdAt: 'desc'}}, calculationRuns: {orderBy: {createdAt: 'desc'}}},
   });
 
   if (!session) return <div>Not found</div>;
@@ -29,6 +33,7 @@ export default async function BreakthroughPage({params}: {params: Promise<{local
     : `This condition is marked ${getConditionImportanceLabel(session.condition.importance, locale)} and is required for the hypothesis to work.`;
   const knownState = ru ? {известно: condition.knownWhat} : {known: condition.knownWhat};
   const missingPieces = ru ? {неизвестно: condition.unknownWhat, необходимые_данные: condition.requiredEvidence} : {unknown: condition.unknownWhat, requiredEvidence: condition.requiredEvidence};
+  const sources = session.condition.sourceReferences.map(source => ({...source, summary: getLocalizedSourceSummary(source, locale)}));
   const calculationLabels = {
     inputs: calc('inputs'),
     result: calc('result'),
@@ -67,6 +72,25 @@ export default async function BreakthroughPage({params}: {params: Promise<{local
           <DiagnosticPanel title={t('paths')} data={condition.possibleWorkarounds} tone="positive" />
           <DiagnosticPanel title={t('bestPath')} data={condition.testMethod} />
         </div>
+      </section>
+
+      <section>
+        <CockpitHeader code="SRC-02" title={sourceT('title')} status={`${sources.length} ${sourceT('count')}`} />
+        <GlassPanel glow className="data-grid mt-5 p-5 sm:p-6">
+          <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
+            <p className="max-w-3xl text-sm leading-6 text-[#91adaf]">{sourceT('description')}</p>
+            <form action={discoverSourcesAction.bind(null, locale, session.hypothesisId, session.conditionId)}>
+              <GlowButton>{sourceT('discoverBlocker')}</GlowButton>
+            </form>
+          </div>
+        </GlassPanel>
+        {sources.length ? (
+          <div className="mt-4 grid gap-4 xl:grid-cols-2">
+            {sources.map(source => <SourceCandidateCard source={source} summary={source.summary} locale={locale} labels={{candidate: sourceT('candidate'), openSearch: sourceT('openSearch')}} key={source.id} />)}
+          </div>
+        ) : (
+          <p className="mt-4 rounded-xl border border-dashed border-cyan-100/[0.1] px-5 py-4 text-xs text-[#78999b]">{sourceT('empty')}</p>
+        )}
       </section>
 
       <section>
@@ -170,7 +194,7 @@ function renderDiagnostic(data: unknown): React.ReactNode {
   if (Array.isArray(data)) return data.length ? <ul className="space-y-2">{data.map((value, index) => <li key={index} className="flex gap-2"><span className="text-cyan-300/40">›</span><span>{formatDiagnostic(value)}</span></li>)}</ul> : <span>—</span>;
   if (typeof data === 'object') {
     const entries = Object.entries(data as Record<string, unknown>);
-    return entries.length ? <dl className="space-y-2">{entries.map(([key, value]) => <div key={key} className="border-l border-cyan-200/10 pl-3"><dt className="text-[9px] tracking-[.1em] text-cyan-200/40 uppercase">{key.replaceAll('_', ' ')}</dt><dd className="mt-1 text-[#a7bfc0]">{formatDiagnostic(value)}</dd></div>)}</dl> : <span>—</span>;
+    return entries.length ? <dl className="space-y-2">{entries.map(([key, value]) => <div key={key} className="border-l border-cyan-200/10 pl-3"><dt className="text-[9px] tracking-[.1em] text-cyan-200/40 uppercase">{humanizeEnum(key)}</dt><dd className="mt-1 text-[#a7bfc0]">{formatDiagnostic(value)}</dd></div>)}</dl> : <span>—</span>;
   }
   return <span>{String(data)}</span>;
 }
@@ -179,5 +203,5 @@ function formatDiagnostic(data: unknown): string {
   if (data === null || data === undefined) return '—';
   if (typeof data === 'string' || typeof data === 'number' || typeof data === 'boolean') return String(data);
   if (Array.isArray(data)) return data.map(formatDiagnostic).join(' · ');
-  return Object.entries(data as Record<string, unknown>).map(([key, value]) => `${key.replaceAll('_', ' ')}: ${formatDiagnostic(value)}`).join(' · ');
+  return Object.entries(data as Record<string, unknown>).map(([key, value]) => `${humanizeEnum(key)}: ${formatDiagnostic(value)}`).join(' · ');
 }
