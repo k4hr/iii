@@ -1,3 +1,4 @@
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -161,6 +162,14 @@ enum SourceRelationship {
   ENGINEERING_LIMIT
   MATHEMATICAL_BASIS
 }
+enum CalculationType {
+  ENERGY_ESTIMATE
+  ENERGY_DENSITY_ESTIMATE
+  SCALE_GAP_ESTIMATE
+  MATERIAL_LIMIT_ESTIMATE
+  MEASUREMENT_SENSITIVITY_ESTIMATE
+  GENERIC_ORDER_OF_MAGNITUDE
+}
 
 model User {
   id              String   @id @default(cuid())
@@ -211,6 +220,7 @@ model Hypothesis {
   sources               SourceReference[]
   breakthroughSessions  BreakthroughSession[]
   simulationRuns        SimulationRun[]
+  calculationRuns       CalculationRun[]
 }
 
 model HypothesisVersion {
@@ -294,6 +304,7 @@ model HypothesisCondition {
   updatedAt             DateTime @updatedAt
   experiments           ExperimentProposal[]
   breakthroughSessions  BreakthroughSession[]
+  calculationRuns       CalculationRun[]
 }
 
 model VisualScene {
@@ -378,6 +389,27 @@ model BreakthroughSession {
   updatedAt       DateTime @updatedAt
   ideas           BreakthroughIdea[]
   events          BreakthroughEvent[]
+  calculationRuns CalculationRun[]
+}
+
+model CalculationRun {
+  id                    String @id @default(cuid())
+  hypothesisId          String
+  hypothesis            Hypothesis @relation(fields: [hypothesisId], references: [id], onDelete: Cascade)
+  conditionId           String?
+  condition             HypothesisCondition? @relation(fields: [conditionId], references: [id], onDelete: SetNull)
+  breakthroughSessionId String?
+  breakthroughSession   BreakthroughSession? @relation(fields: [breakthroughSessionId], references: [id], onDelete: SetNull)
+  title                 String
+  calculationType       CalculationType
+  inputJson             Json
+  resultJson            Json
+  explanation           String
+  createdAt             DateTime @default(now())
+
+  @@index([hypothesisId, createdAt])
+  @@index([conditionId])
+  @@index([breakthroughSessionId])
 }
 
 model BreakthroughIdea {

@@ -121,6 +121,21 @@
     "safety": "Safety",
     "difficulty": "Difficulty"
   },
+  "calculations": {
+    "title": "Calculations",
+    "description": "Deterministic rough estimates for the largest physical or engineering gap.",
+    "run": "Run rough calculation",
+    "runForCondition": "Calculate condition",
+    "empty": "No calculations yet. Run the first estimate to establish a numerical baseline.",
+    "inputs": "Inputs",
+    "result": "Result",
+    "required": "Required",
+    "available": "Available",
+    "ratio": "Gap ratio",
+    "orders": "Orders of magnitude",
+    "preliminary": "Preliminary estimate",
+    "history": "calculation runs"
+  },
   "settings": {
     "title": "Settings",
     "preferredLanguage": "Preferred language",

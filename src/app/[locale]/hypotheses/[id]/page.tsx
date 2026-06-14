@@ -3,11 +3,14 @@ import {prisma} from '@/lib/db/prisma';
 import {ProgressPanel} from '@/components/hypotheses/ProgressPanel';
 import {ConditionCard} from '@/components/hypotheses/ConditionCard';
 import {VisualSceneCards} from '@/components/visual-lab/VisualSceneCards';
+import {CalculationCard} from '@/components/calculations/CalculationCard';
 import {GlassPanel} from '@/components/ui/GlassPanel';
+import {GlowButton} from '@/components/ui/GlowButton';
 import {StatusBadge} from '@/components/ui/StatusBadge';
 import {createMockAnalysisTranslation, createMockSources} from '@/lib/ai/analyze-hypothesis';
 import {localizeMockValue} from '@/lib/locale/mock-copy';
 import {getEnumLabel, getExperimentDifficultyLabel, getExperimentTypeLabel, getSafetyLevelLabel, getSourceRelationshipLabel, getVerdictLevelLabel} from '@/lib/locale/enum-labels';
+import {runCalculationAction} from '@/server/actions/calculations';
 
 export default async function HypothesisPage({params}: {params: Promise<{locale: string; id: string}>}) {
   const {locale, id} = await params;
@@ -15,6 +18,7 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
   const v = await getTranslations('visual');
   const e = await getTranslations('experiments');
   const c = await getTranslations('common');
+  const calc = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'calculations'});
   const hypothesis = await prisma.hypothesis.findUnique({
     where: {id},
     include: {
@@ -25,6 +29,7 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
       sources: true,
       versions: true,
       simulationRuns: true,
+      calculationRuns: {orderBy: {createdAt: 'desc'}, include: {condition: true}},
     },
   });
 
@@ -38,6 +43,15 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
   const blockers = conditions.filter(condition => condition.importance === 'CRITICAL').map(condition => condition.title).slice(0, 3);
   const labels = {progress: c('progress'), known: t('known'), unknown: t('unknown'), blockers: t('blockers'), conflicts: t('conflicts'), ifSolved: t('ifSolved'), testMethod: t('testMethod'), start: c('startBreakthrough')};
   const minimalExperiments = Array.isArray(translation?.minimalExperiments) ? translation.minimalExperiments : [];
+  const calculationLabels = {
+    inputs: calc('inputs'),
+    result: calc('result'),
+    required: calc('required'),
+    available: calc('available'),
+    ratio: calc('ratio'),
+    orders: calc('orders'),
+    preliminary: calc('preliminary'),
+  };
 
   return (
     <div className="space-y-10 py-3">
@@ -55,6 +69,39 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
       </header>
 
       <ProgressPanel analysis={analysis} blockers={blockers} locale={locale} t={(key) => t(key)} />
+
+      <section>
+        <SectionHeader code="CALC-01" title={calc('title')} detail={`${hypothesis.calculationRuns.length} ${calc('history')}`} />
+        <GlassPanel glow className="data-grid mt-5 p-5 sm:p-6">
+          <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
+            <div>
+              <div className="section-kicker">ORDER-OF-MAGNITUDE V1</div>
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-[#91adaf]">{calc('description')}</p>
+            </div>
+            <form action={runCalculationAction.bind(null, locale, hypothesis.id, undefined, undefined)}>
+              <GlowButton>{calc('run')}</GlowButton>
+            </form>
+          </div>
+          <div className="mt-6 grid gap-3 border-t border-cyan-100/[0.07] pt-5 md:grid-cols-2 xl:grid-cols-3">
+            {conditions.map(condition => (
+              <form action={runCalculationAction.bind(null, locale, hypothesis.id, condition.id, undefined)} className="flex items-center justify-between gap-4 rounded-xl border border-cyan-100/[0.07] bg-black/25 p-4" key={condition.id}>
+                <span className="text-xs leading-5 text-cyan-50/75">{condition.title}</span>
+                <GlowButton className="shrink-0" variant="quiet">{calc('runForCondition')}</GlowButton>
+              </form>
+            ))}
+          </div>
+        </GlassPanel>
+        {hypothesis.calculationRuns.length ? (
+          <div className="mt-4 grid gap-4 xl:grid-cols-2">
+            {hypothesis.calculationRuns.map(calculation => {
+              const calculationCondition = calculation.condition ? localizeMockValue(calculation.condition, locale) : null;
+              return <CalculationCard calculation={calculation} labels={calculationLabels} locale={locale} subject={calculationCondition?.title || hypothesis.originalTitle} key={calculation.id} />;
+            })}
+          </div>
+        ) : (
+          <p className="mt-4 rounded-xl border border-dashed border-cyan-100/[0.1] px-5 py-4 text-xs text-[#78999b]">{calc('empty')}</p>
+        )}
+      </section>
 
       <section className="grid gap-4 lg:grid-cols-[1.12fr_.88fr]">
         <GlassPanel className="p-6 sm:p-7">

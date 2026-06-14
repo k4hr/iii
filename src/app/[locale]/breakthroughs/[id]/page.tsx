@@ -1,6 +1,8 @@
 import {getTranslations} from 'next-intl/server';
 import {prisma} from '@/lib/db/prisma';
 import {addIdeaAction, addUserNoteAction} from '@/server/actions/breakthroughs';
+import {runCalculationAction} from '@/server/actions/calculations';
+import {CalculationCard} from '@/components/calculations/CalculationCard';
 import {GlassPanel} from '@/components/ui/GlassPanel';
 import {GlowButton} from '@/components/ui/GlowButton';
 import {ProgressRing} from '@/components/ui/ProgressRing';
@@ -12,9 +14,10 @@ import {getBreakthroughStatusLabel, getConditionImportanceLabel, getIdeaStatusLa
 export default async function BreakthroughPage({params}: {params: Promise<{locale: string; id: string}>}) {
   const {locale, id} = await params;
   const t = await getTranslations('breakthrough');
+  const calc = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'calculations'});
   const session = await prisma.breakthroughSession.findUnique({
     where: {id},
-    include: {condition: true, hypothesis: true, ideas: {orderBy: {createdAt: 'desc'}, include: {checks: true}}, events: {orderBy: {createdAt: 'desc'}}},
+    include: {condition: true, hypothesis: true, ideas: {orderBy: {createdAt: 'desc'}, include: {checks: true}}, events: {orderBy: {createdAt: 'desc'}}, calculationRuns: {orderBy: {createdAt: 'desc'}}},
   });
 
   if (!session) return <div>Not found</div>;
@@ -26,6 +29,15 @@ export default async function BreakthroughPage({params}: {params: Promise<{local
     : `This condition is marked ${getConditionImportanceLabel(session.condition.importance, locale)} and is required for the hypothesis to work.`;
   const knownState = ru ? {известно: condition.knownWhat} : {known: condition.knownWhat};
   const missingPieces = ru ? {неизвестно: condition.unknownWhat, необходимые_данные: condition.requiredEvidence} : {unknown: condition.unknownWhat, requiredEvidence: condition.requiredEvidence};
+  const calculationLabels = {
+    inputs: calc('inputs'),
+    result: calc('result'),
+    required: calc('required'),
+    available: calc('available'),
+    ratio: calc('ratio'),
+    orders: calc('orders'),
+    preliminary: calc('preliminary'),
+  };
 
   return (
     <div className="space-y-10 py-3">
@@ -55,6 +67,28 @@ export default async function BreakthroughPage({params}: {params: Promise<{local
           <DiagnosticPanel title={t('paths')} data={condition.possibleWorkarounds} tone="positive" />
           <DiagnosticPanel title={t('bestPath')} data={condition.testMethod} />
         </div>
+      </section>
+
+      <section>
+        <CockpitHeader code="CALC-02" title={calc('title')} status={`${session.calculationRuns.length} ${calc('history')}`} />
+        <GlassPanel glow className="data-grid mt-5 p-5 sm:p-6">
+          <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
+            <div>
+              <div className="section-kicker">ORDER-OF-MAGNITUDE V1</div>
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-[#91adaf]">{calc('description')}</p>
+            </div>
+            <form action={runCalculationAction.bind(null, locale, session.hypothesisId, session.conditionId, session.id)}>
+              <GlowButton>{calc('run')}</GlowButton>
+            </form>
+          </div>
+        </GlassPanel>
+        {session.calculationRuns.length ? (
+          <div className="mt-4 grid gap-4 xl:grid-cols-2">
+            {session.calculationRuns.map(calculation => <CalculationCard calculation={calculation} labels={calculationLabels} locale={locale} subject={condition.title} key={calculation.id} />)}
+          </div>
+        ) : (
+          <p className="mt-4 rounded-xl border border-dashed border-cyan-100/[0.1] px-5 py-4 text-xs text-[#78999b]">{calc('empty')}</p>
+        )}
       </section>
 
       <GlassPanel glow className="overflow-hidden">
