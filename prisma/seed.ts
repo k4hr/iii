@@ -5,12 +5,13 @@ import {analyzeHypothesisMock} from '../src/lib/ai/analyze-hypothesis';
 
 const prisma = new PrismaClient();
 
-async function seedHypothesis(projectId: string, title: string, text: string, domain?: string) {
+async function seedHypothesis(ownerId: string, projectId: string, title: string, text: string, domain?: string) {
   const originalLocale = detectLanguage(`${title}\n${text}`);
   const canonical = createCanonicalHypothesis({title, text, locale: originalLocale});
   const mock = analyzeHypothesisMock({title: canonical.canonicalTitleEn, text: canonical.canonicalTextEn, analysisLocale: Locale.EN});
   const h = await prisma.hypothesis.create({
     data: {
+      ownerId,
       projectId,
       originalLocale,
       originalTitle: title,
@@ -93,7 +94,7 @@ async function seedHypothesis(projectId: string, title: string, text: string, do
   const firstCondition = await prisma.hypothesisCondition.findFirst({where:{hypothesisId:h.id}, orderBy:{createdAt:'asc'}});
   if (firstCondition) {
     await prisma.breakthroughSession.create({data:{
-      projectId, hypothesisId:h.id, conditionId:firstCondition.id, title:firstCondition.title, problemStatement:firstCondition.description,
+      ownerId, projectId, hypothesisId:h.id, conditionId:firstCondition.id, title:firstCondition.title, problemStatement:firstCondition.description,
       whyItMatters:`Seed session for critical condition ${firstCondition.importance}.`, ifSolvedImpact:(firstCondition.ifSolvedImpactJson ?? {}) as Prisma.InputJsonValue,
       knownState:{knownWhat:firstCondition.knownWhat}, missingPieces:{unknownWhat:firstCondition.unknownWhat}, blockers:firstCondition.blockers as Prisma.InputJsonValue,
       conflicts:firstCondition.conflicts as Prisma.InputJsonValue, possiblePaths:firstCondition.possibleWorkarounds as Prisma.InputJsonValue, currentBestPath:firstCondition.testMethod,
@@ -122,13 +123,13 @@ async function main() {
   await prisma.unsolvedProblem.deleteMany();
 
   const user = await prisma.user.upsert({where:{email:'demo@theoryforge.local'}, update:{}, create:{email:'demo@theoryforge.local', name:'Demo Researcher', preferredLocale:Locale.EN}});
-  const time = await prisma.project.create({data:{userId:user.id,title:'Time Manipulation',description:'Research direction for time dilation, spacetime engineering and causality-safe tests.'}});
-  const energy = await prisma.project.create({data:{userId:user.id,title:'Compact Energy Systems',description:'Wearable high-density power, thermal constraints and materials.'}});
-  const battery = await prisma.project.create({data:{userId:user.id,title:'Advanced Batteries',description:'Lithium-air, filtration and next-generation storage.'}});
+  const time = await prisma.project.create({data:{ownerId:user.id,title:'Time Manipulation',description:'Research direction for time dilation, spacetime engineering and causality-safe tests.'}});
+  const energy = await prisma.project.create({data:{ownerId:user.id,title:'Compact Energy Systems',description:'Wearable high-density power, thermal constraints and materials.'}});
+  const battery = await prisma.project.create({data:{ownerId:user.id,title:'Advanced Batteries',description:'Lithium-air, filtration and next-generation storage.'}});
 
-  await seedHypothesis(time.id, 'Local time dilation field using rotating electromagnetic fields', 'Can a rotating electromagnetic field create a measurable local time dilation effect inside a chamber?', 'spacetime physics');
-  await seedHypothesis(energy.id, 'Compact Iron Man-like power source', 'Can a wearable power source deliver extreme energy density safely enough for powered flight and armor systems?', 'energy systems');
-  await seedHypothesis(battery.id, 'Lithium-air battery with advanced atmospheric filtration', 'Can a lithium-air battery use a smart filter that admits oxygen but blocks water, CO2 and contaminants?', 'battery chemistry');
+  await seedHypothesis(user.id, time.id, 'Local time dilation field using rotating electromagnetic fields', 'Can a rotating electromagnetic field create a measurable local time dilation effect inside a chamber?', 'spacetime physics');
+  await seedHypothesis(user.id, energy.id, 'Compact Iron Man-like power source', 'Can a wearable power source deliver extreme energy density safely enough for powered flight and armor systems?', 'energy systems');
+  await seedHypothesis(user.id, battery.id, 'Lithium-air battery with advanced atmospheric filtration', 'Can a lithium-air battery use a smart filter that admits oxygen but blocks water, CO2 and contaminants?', 'battery chemistry');
 
   await prisma.physicalLaw.createMany({data:[
     {slug:'energy-conservation', title:'Conservation of Energy', description:'Energy cannot be created or destroyed in an isolated system.', domain:'physics'},

@@ -6,18 +6,35 @@ import {GlowButton} from '@/components/ui/GlowButton';
 import {LabMetricCard} from '@/components/ui/LabMetricCard';
 import {StatusBadge} from '@/components/ui/StatusBadge';
 import {getEnumLabel} from '@/lib/locale/enum-labels';
+import {getCurrentUser} from '@/lib/auth/current-user';
+import {buildLabLog} from '@/lib/lab-log/build-lab-log';
+import {LabLogTimeline} from '@/components/lab-log/LabLogTimeline';
+import {redirect} from 'next/navigation';
 
 export default async function Dashboard({params}: {params: Promise<{locale: string}>}) {
   const {locale} = await params;
-  const t = await getTranslations('dashboard');
+  const t = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'dashboard'});
   const c = await getTranslations('common');
-  const [projects, hypotheses, sessions] = await Promise.all([
-    prisma.project.findMany({take: 3, orderBy: {createdAt: 'desc'}}),
-    prisma.hypothesis.findMany({take: 4, orderBy: {createdAt: 'desc'}, include: {analyses: {take: 1, orderBy: {createdAt: 'desc'}}}}),
-    prisma.breakthroughSession.findMany({take: 3, orderBy: {createdAt: 'desc'}, include: {hypothesis: true}}),
+  const labT = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'labLog'});
+  const user = await getCurrentUser();
+  if (!user) redirect(`/${locale}/account`);
+  const [projects, hypotheses, sessions, calculations, labLogItems] = await Promise.all([
+    prisma.project.findMany({where: {ownerId: user.id}, take: 3, orderBy: {createdAt: 'desc'}}),
+    prisma.hypothesis.findMany({where: {ownerId: user.id}, take: 4, orderBy: {createdAt: 'desc'}, include: {analyses: {take: 1, orderBy: {createdAt: 'desc'}}}}),
+    prisma.breakthroughSession.findMany({where: {ownerId: user.id, status: 'ACTIVE', hypothesis: {ownerId: user.id}}, take: 3, orderBy: {createdAt: 'desc'}, include: {hypothesis: true}}),
+    prisma.calculationRun.findMany({where: {hypothesis: {ownerId: user.id}}, take: 4, orderBy: {createdAt: 'desc'}, include: {hypothesis: true}}),
+    buildLabLog({locale: locale === 'ru' ? 'ru' : 'en'}),
   ]);
   const avg = hypotheses[0]?.analyses[0] || {researchProgress: 0, functionalityProgress: 0, testabilityProgress: 0};
   const ru = locale === 'ru';
+  const labLogLabels = {
+    title: labT('title'), workspaceTitle: labT('workspaceTitle'), events: labT('events'), details: labT('details'), noEvents: labT('noEvents'),
+    sourceTypes: {
+      hypothesis: labT('sourceTypes.hypothesis'), condition: labT('sourceTypes.condition'), breakthrough: labT('sourceTypes.breakthrough'), idea: labT('sourceTypes.idea'),
+      calculation: labT('sourceTypes.calculation'), source: labT('sourceTypes.source'), experiment: labT('sourceTypes.experiment'), simulation: labT('sourceTypes.simulation'), system: labT('sourceTypes.system'),
+    },
+    severity: {info: labT('severity.info'), success: labT('severity.success'), warning: labT('severity.warning'), critical: labT('severity.critical')},
+  };
 
   return (
     <div className="space-y-10 py-3">
@@ -45,9 +62,13 @@ export default async function Dashboard({params}: {params: Promise<{locale: stri
         </GlassPanel>
       </section>
 
-      <DashboardGrid locale={locale} title={t('recentProjects')} index="01" items={projects.map(project => ({title: project.title, href: `/${locale}/projects/${project.id}`, meta: project.description || ''}))} />
-      <DashboardGrid locale={locale} title={t('recentHypotheses')} index="02" items={hypotheses.map(hypothesis => ({title: hypothesis.originalTitle, href: `/${locale}/hypotheses/${hypothesis.id}`, meta: getEnumLabel(hypothesis.status, locale)}))} />
+      <DashboardGrid locale={locale} title={t('myProjects')} index="01" items={projects.map(project => ({title: project.title, href: `/${locale}/projects/${project.id}`, meta: project.description || ''}))} />
+      <DashboardGrid locale={locale} title={t('myHypotheses')} index="02" items={hypotheses.map(hypothesis => ({title: hypothesis.originalTitle, href: `/${locale}/hypotheses/${hypothesis.id}`, meta: getEnumLabel(hypothesis.status, locale)}))} />
       <DashboardGrid locale={locale} title={t('activeBreakthroughs')} index="03" items={sessions.map(session => ({title: session.title, href: `/${locale}/breakthroughs/${session.id}`, meta: session.hypothesis.originalTitle, status: session.status}))} />
+      <DashboardGrid locale={locale} title={t('recentCalculations')} index="04" items={calculations.map(calculation => ({title: calculation.title, href: `/${locale}/hypotheses/${calculation.hypothesisId}#calculations`, meta: calculation.hypothesis.originalTitle}))} />
+      <section>
+        <LabLogTimeline items={labLogItems.slice(0, 12)} locale={locale} labels={labLogLabels} />
+      </section>
     </div>
   );
 }

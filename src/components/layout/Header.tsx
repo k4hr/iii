@@ -24,6 +24,7 @@ export function Header({locale}: {locale: string}) {
           <NavLink href={`/${locale}/dashboard`}>{t('dashboard')}</NavLink>
           <NavLink href={`/${locale}/projects`}>{t('projects')}</NavLink>
           <NavLink href={`/${locale}/hypotheses`}>{t('hypotheses')}</NavLink>
+          <NavLink href={`/${locale}/account`}>{locale === 'ru' || locale === 'en' ? t('account') : 'Account'}</NavLink>
           <NavLink href={`/${locale}/settings`}>{t('settings')}</NavLink>
         </nav>
 

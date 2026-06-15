@@ -6,10 +6,14 @@ import {prisma} from '@/lib/db/prisma';
 import {evaluateBreakthroughIdea} from '@/lib/ai/evaluate-breakthrough-idea';
 import {getOpenAIClient} from '@/lib/ai/openai-client';
 import {routeLocaleToPrisma} from '@/lib/locale/locale';
+import {requireCurrentUser} from '@/lib/auth/current-user';
 
 export async function addIdeaAction(locale: string, sessionId: string, formData: FormData) {
+  const user = await requireCurrentUser();
   const rawText = String(formData.get('rawText') || '').trim();
   if (!rawText) return;
+  const session = await prisma.breakthroughSession.findFirst({where: {id: sessionId, ownerId: user.id}, select: {id: true}});
+  if (!session) throw new Error('Breakthrough session not found in the current workspace.');
   getOpenAIClient();
   const analysisLocale = routeLocaleToPrisma(locale);
   const review = evaluateBreakthroughIdea(rawText, analysisLocale);
@@ -33,8 +37,11 @@ export async function addIdeaAction(locale: string, sessionId: string, formData:
 }
 
 export async function addUserNoteAction(locale: string, sessionId: string, formData: FormData) {
+  const user = await requireCurrentUser();
   const note = String(formData.get('note') || '').trim();
   if (!note) return;
+  const session = await prisma.breakthroughSession.findFirst({where: {id: sessionId, ownerId: user.id}, select: {id: true}});
+  if (!session) throw new Error('Breakthrough session not found in the current workspace.');
   await prisma.breakthroughEvent.create({data: {sessionId, type: 'USER_NOTE', content: {note} as Prisma.InputJsonValue}});
   revalidatePath(`/${locale}/breakthroughs/${sessionId}`);
 }

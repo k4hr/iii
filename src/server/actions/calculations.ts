@@ -5,6 +5,7 @@ import {revalidatePath} from 'next/cache';
 import {DesiredEffectLevel, runOrderOfMagnitudeCalculation, runParameterEstimate} from '@/lib/calculations/order-of-magnitude';
 import {prisma} from '@/lib/db/prisma';
 import {localizeMockValue} from '@/lib/locale/mock-copy';
+import {requireCurrentUser} from '@/lib/auth/current-user';
 
 export async function runCalculationAction(
   locale: string,
@@ -13,8 +14,9 @@ export async function runCalculationAction(
   breakthroughSessionId?: string,
   _formData?: FormData
 ) {
-  const hypothesis = await prisma.hypothesis.findUnique({
-    where: {id: hypothesisId},
+  const user = await requireCurrentUser();
+  const hypothesis = await prisma.hypothesis.findFirst({
+    where: {id: hypothesisId, ownerId: user.id},
     include: {analyses: {orderBy: {createdAt: 'desc'}, take: 1}},
   });
   if (!hypothesis) throw new Error('Hypothesis not found.');
@@ -28,6 +30,7 @@ export async function runCalculationAction(
     ? await prisma.breakthroughSession.findFirst({
         where: {
           id: breakthroughSessionId,
+          ownerId: user.id,
           hypothesisId,
           ...(conditionId ? {conditionId} : {}),
         },
@@ -97,8 +100,9 @@ export async function runParameterCalculationAction(
   breakthroughSessionId: string | undefined,
   parameters: FormData
 ) {
-  const hypothesis = await prisma.hypothesis.findUnique({
-    where: {id: hypothesisId},
+  const user = await requireCurrentUser();
+  const hypothesis = await prisma.hypothesis.findFirst({
+    where: {id: hypothesisId, ownerId: user.id},
     include: {analyses: {orderBy: {createdAt: 'desc'}, take: 1}},
   });
   if (!hypothesis) throw new Error('Hypothesis not found.');
@@ -110,7 +114,7 @@ export async function runParameterCalculationAction(
 
   const breakthroughSession = breakthroughSessionId
     ? await prisma.breakthroughSession.findFirst({
-        where: {id: breakthroughSessionId, hypothesisId, ...(conditionId ? {conditionId} : {})},
+        where: {id: breakthroughSessionId, ownerId: user.id, hypothesisId, ...(conditionId ? {conditionId} : {})},
       })
     : null;
   if (breakthroughSessionId && !breakthroughSession) {

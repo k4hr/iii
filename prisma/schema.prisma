@@ -185,20 +185,22 @@ model User {
 
 model Project {
   id          String   @id @default(cuid())
-  userId      String?
-  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  ownerId     String?  @map("userId")
+  owner       User?    @relation(fields: [ownerId], references: [id], onDelete: SetNull)
   title       String
   description String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   hypotheses  Hypothesis[]
   breakthroughSessions BreakthroughSession[]
+
+  @@index([ownerId])
 }
 
 model Hypothesis {
   id                    String   @id @default(cuid())
-  userId                String?
-  user                  User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  ownerId               String?  @map("userId")
+  owner                 User?    @relation(fields: [ownerId], references: [id], onDelete: SetNull)
   projectId             String?
   project               Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   originalLocale        Locale
@@ -221,6 +223,8 @@ model Hypothesis {
   breakthroughSessions  BreakthroughSession[]
   simulationRuns        SimulationRun[]
   calculationRuns       CalculationRun[]
+
+  @@index([ownerId])
 }
 
 model HypothesisVersion {
@@ -370,8 +374,8 @@ model SourceReference {
 
 model BreakthroughSession {
   id              String @id @default(cuid())
-  userId          String?
-  user            User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  ownerId         String? @map("userId")
+  owner           User? @relation(fields: [ownerId], references: [id], onDelete: SetNull)
   projectId       String?
   project         Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   hypothesisId    String
@@ -395,6 +399,8 @@ model BreakthroughSession {
   ideas           BreakthroughIdea[]
   events          BreakthroughEvent[]
   calculationRuns CalculationRun[]
+
+  @@index([ownerId])
 }
 
 model CalculationRun {

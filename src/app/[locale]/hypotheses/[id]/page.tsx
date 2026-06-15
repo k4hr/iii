@@ -20,6 +20,8 @@ import {buildLabLog} from '@/lib/lab-log/build-lab-log';
 import {buildVisualModel} from '@/lib/visual-lab/build-visual-model';
 import {runCalculationAction, runParameterCalculationAction} from '@/server/actions/calculations';
 import {discoverSourcesAction} from '@/server/actions/sources';
+import {getCurrentUser} from '@/lib/auth/current-user';
+import {notFound, redirect} from 'next/navigation';
 
 export default async function HypothesisPage({params}: {params: Promise<{locale: string; id: string}>}) {
   const {locale, id} = await params;
@@ -31,8 +33,10 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
   const sourceT = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'sources'});
   const labT = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'labLog'});
   const visualLabT = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'visualLab'});
-  const hypothesis = await prisma.hypothesis.findUnique({
-    where: {id},
+  const user = await getCurrentUser();
+  if (!user) redirect(`/${locale}/account`);
+  const hypothesis = await prisma.hypothesis.findFirst({
+    where: {id, ownerId: user.id},
     include: {
       analyses: {orderBy: {createdAt: 'desc'}, take: 1, include: {translations: true}},
       conditions: {orderBy: [{importance: 'asc'}, {createdAt: 'asc'}]},
@@ -42,11 +46,11 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
       versions: true,
       simulationRuns: true,
       calculationRuns: {orderBy: {createdAt: 'desc'}, include: {condition: true}},
-      breakthroughSessions: {orderBy: {createdAt: 'desc'}},
+      breakthroughSessions: {where: {ownerId: user.id}, orderBy: {createdAt: 'desc'}},
     },
   });
 
-  if (!hypothesis || !hypothesis.analyses[0]) return <div>Not found</div>;
+  if (!hypothesis || !hypothesis.analyses[0]) notFound();
   const labLogItems = await buildLabLog({locale: locale === 'ru' ? 'ru' : 'en', hypothesisId: id});
   const analysis = hypothesis.analyses[0];
   const translation = createMockAnalysisTranslation({title: hypothesis.originalTitle, text: hypothesis.originalText, locale});

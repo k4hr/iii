@@ -17,6 +17,8 @@ import {getBreakthroughStatusLabel, getConditionImportanceLabel, getEnumLabel, g
 import {getLocalizedSourceSummary} from '@/lib/sources/source-discovery';
 import {isParameterCalculationInput} from '@/lib/calculations/order-of-magnitude';
 import {buildLabLog} from '@/lib/lab-log/build-lab-log';
+import {getCurrentUser} from '@/lib/auth/current-user';
+import {notFound, redirect} from 'next/navigation';
 
 export default async function BreakthroughPage({params}: {params: Promise<{locale: string; id: string}>}) {
   const {locale, id} = await params;
@@ -24,12 +26,14 @@ export default async function BreakthroughPage({params}: {params: Promise<{local
   const calc = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'calculations'});
   const sourceT = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'sources'});
   const labT = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'labLog'});
-  const session = await prisma.breakthroughSession.findUnique({
-    where: {id},
+  const user = await getCurrentUser();
+  if (!user) redirect(`/${locale}/account`);
+  const session = await prisma.breakthroughSession.findFirst({
+    where: {id, ownerId: user.id},
     include: {condition: {include: {sourceReferences: {orderBy: {createdAt: 'desc'}}}}, hypothesis: {include: {analyses: {orderBy: {createdAt: 'desc'}, take: 1}}}, ideas: {orderBy: {createdAt: 'desc'}, include: {checks: true}}, calculationRuns: {orderBy: {createdAt: 'desc'}}},
   });
 
-  if (!session) return <div>Not found</div>;
+  if (!session) notFound();
   const labLogItems = await buildLabLog({locale: locale === 'ru' ? 'ru' : 'en', breakthroughSessionId: id});
   const ru = locale === 'ru';
   const condition = localizeMockValue(session.condition, locale);

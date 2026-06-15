@@ -7,6 +7,7 @@ import {prisma} from '@/lib/db/prisma';
 import {getEnumLabel, getIdeaStatusLabel, getSourceRelationshipLabel} from '@/lib/locale/enum-labels';
 import {localizeMockValue} from '@/lib/locale/mock-copy';
 import {getLocalizedSourceSummary} from '@/lib/sources/source-discovery';
+import {requireCurrentUser} from '@/lib/auth/current-user';
 
 export type LabLogSeverity = 'info' | 'success' | 'warning' | 'critical';
 export type LabLogSourceType = 'hypothesis' | 'condition' | 'breakthrough' | 'idea' | 'calculation' | 'source' | 'experiment' | 'simulation' | 'system';
@@ -33,27 +34,38 @@ export type BuildLabLogInput = {
 type LabLogLabels = typeof enMessages.labLog | typeof ruMessages.labLog;
 
 export async function buildLabLog(input: BuildLabLogInput): Promise<LabLogItem[]> {
+  const user = await requireCurrentUser();
   const locale = input.locale === 'ru' ? 'ru' : 'en';
   const labels = locale === 'ru' ? ruMessages.labLog : enMessages.labLog;
   const sessionContext = input.breakthroughSessionId
-    ? await prisma.breakthroughSession.findUnique({
-        where: {id: input.breakthroughSessionId},
+    ? await prisma.breakthroughSession.findFirst({
+        where: {id: input.breakthroughSessionId, ownerId: user.id},
         select: {id: true, hypothesisId: true, conditionId: true, projectId: true},
       })
     : null;
 
-  const projectHypotheses = input.projectId
-    ? await prisma.hypothesis.findMany({where: {projectId: input.projectId}, select: {id: true}})
+  const directHypothesis = input.hypothesisId
+    ? await prisma.hypothesis.findFirst({where: {id: input.hypothesisId, ownerId: user.id}, select: {id: true}})
+    : null;
+  const project = input.projectId
+    ? await prisma.project.findFirst({where: {id: input.projectId, ownerId: user.id}, select: {id: true}})
+    : null;
+  const projectHypotheses = project
+    ? await prisma.hypothesis.findMany({where: {projectId: project.id, ownerId: user.id}, select: {id: true}})
+    : [];
+  const workspaceHypotheses = !input.hypothesisId && !input.breakthroughSessionId && !input.projectId
+    ? await prisma.hypothesis.findMany({where: {ownerId: user.id}, orderBy: {updatedAt: 'desc'}, take: 20, select: {id: true}})
     : [];
   const hypothesisIds = Array.from(new Set([
-    ...(input.hypothesisId ? [input.hypothesisId] : []),
+    ...(directHypothesis ? [directHypothesis.id] : []),
     ...(sessionContext ? [sessionContext.hypothesisId] : []),
     ...projectHypotheses.map(hypothesis => hypothesis.id),
+    ...workspaceHypotheses.map(hypothesis => hypothesis.id),
   ]));
   if (!hypothesisIds.length) return [];
 
   const breakthroughOnly = Boolean(sessionContext);
-  const sessionWhere = sessionContext ? {id: sessionContext.id} : {hypothesisId: {in: hypothesisIds}};
+  const sessionWhere = sessionContext ? {id: sessionContext.id, ownerId: user.id} : {ownerId: user.id, hypothesisId: {in: hypothesisIds}};
   const conditionWhere = sessionContext ? {id: sessionContext.conditionId} : {hypothesisId: {in: hypothesisIds}};
 
   const [
@@ -67,7 +79,7 @@ export async function buildLabLog(input: BuildLabLogInput): Promise<LabLogItem[]
     simulations,
     sessions,
   ] = await Promise.all([
-    prisma.hypothesis.findMany({where: {id: {in: hypothesisIds}}}),
+    prisma.hypothesis.findMany({where: {id: {in: hypothesisIds}, ownerId: user.id}}),
     prisma.hypothesisAnalysis.findMany({where: {hypothesisId: {in: hypothesisIds}}, orderBy: {createdAt: 'desc'}}),
     prisma.hypothesisCondition.findMany({where: conditionWhere, orderBy: {createdAt: 'asc'}}),
     breakthroughOnly ? Promise.resolve([]) : prisma.hypothesisVersion.findMany({where: {hypothesisId: {in: hypothesisIds}}, orderBy: {createdAt: 'desc'}}),

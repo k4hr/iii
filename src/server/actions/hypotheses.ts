@@ -10,6 +10,7 @@ import {getOpenAIClient} from '@/lib/ai/openai-client';
 import {routeLocaleToPrisma} from '@/lib/locale/locale';
 import {getConditionImportanceLabel} from '@/lib/locale/enum-labels';
 import {localizeMockValue} from '@/lib/locale/mock-copy';
+import {requireCurrentUser} from '@/lib/auth/current-user';
 
 function jsonValueOrObject(value: Prisma.JsonValue | null | undefined): Prisma.InputJsonValue {
   if (value === null || value === undefined) return {};
@@ -17,19 +18,26 @@ function jsonValueOrObject(value: Prisma.JsonValue | null | undefined): Prisma.I
 }
 
 export async function createProjectAction(locale: string, formData: FormData) {
+  const user = await requireCurrentUser();
   const title = String(formData.get('title') || '').trim();
   const description = String(formData.get('description') || '').trim();
   if (!title) return;
-  await prisma.project.create({data: {title, description}});
+  await prisma.project.create({data: {ownerId: user.id, title, description}});
   redirect(`/${locale}/projects`);
 }
 
 export async function createHypothesisAction(locale: string, formData: FormData) {
+  const user = await requireCurrentUser();
   const title = String(formData.get('title') || '').trim();
   const rawText = String(formData.get('rawText') || '').trim();
   const domain = String(formData.get('domain') || '').trim() || undefined;
   const projectId = String(formData.get('projectId') || '').trim() || undefined;
   if (!title || !rawText) return;
+
+  const project = projectId
+    ? await prisma.project.findFirst({where: {id: projectId, ownerId: user.id}, select: {id: true}})
+    : null;
+  if (projectId && !project) throw new Error('Project not found in the current workspace.');
 
   getOpenAIClient();
 
@@ -40,6 +48,7 @@ export async function createHypothesisAction(locale: string, formData: FormData)
 
   const hypothesis = await prisma.hypothesis.create({
     data: {
+      ownerId: user.id,
       originalLocale,
       originalTitle: title,
       originalText: rawText,
@@ -48,7 +57,7 @@ export async function createHypothesisAction(locale: string, formData: FormData)
       interfaceLocaleAtCreate: routeLocaleToPrisma(locale),
       analysisLocale,
       domain,
-      projectId,
+      projectId: project?.id,
       status: 'DONE',
       versions: {create: {versionNumber: 1, title, text: rawText, canonicalTextEn: canonical.canonicalTextEn, changeSummary: 'Initial version'}},
       analyses: {
@@ -127,11 +136,16 @@ export async function createHypothesisAction(locale: string, formData: FormData)
 }
 
 export async function startBreakthroughAction(locale: string, conditionId: string) {
-  const condition = await prisma.hypothesisCondition.findUnique({include: {hypothesis: true}, where: {id: conditionId}});
+  const user = await requireCurrentUser();
+  const condition = await prisma.hypothesisCondition.findFirst({
+    include: {hypothesis: true},
+    where: {id: conditionId, hypothesis: {ownerId: user.id}},
+  });
   if (!condition) return;
   const localized = localizeMockValue(condition, locale);
   const session = await prisma.breakthroughSession.create({
     data: {
+      ownerId: user.id,
       projectId: condition.hypothesis.projectId,
       hypothesisId: condition.hypothesisId,
       conditionId: condition.id,

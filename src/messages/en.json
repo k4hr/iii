@@ -5,6 +5,7 @@
     "projects": "Projects",
     "hypotheses": "Hypotheses",
     "settings": "Settings",
+    "account": "Account",
     "newHypothesis": "New Hypothesis",
     "createProject": "Create Project",
     "startBreakthrough": "Start Breakthrough",
@@ -32,14 +33,18 @@
     "labLabel": "AI Research Laboratory"
   },
   "dashboard": {
-    "title": "Research Dashboard",
+    "title": "Dashboard",
     "subtitle": "Your projects, hypotheses and active breakthrough sessions.",
     "research": "Research Progress",
     "functionality": "Real-World Functionality",
     "testability": "Testability",
     "recentProjects": "Recent Projects",
     "recentHypotheses": "Recent Hypotheses",
-    "activeBreakthroughs": "Active Breakthroughs"
+    "myProjects": "My projects",
+    "myHypotheses": "My hypotheses",
+    "activeBreakthroughs": "Active breakthroughs",
+    "recentCalculations": "Recent calculations",
+    "labLog": "Lab Log"
   },
   "projects": {
     "title": "Research Projects",
@@ -48,6 +53,7 @@
   },
   "hypothesis": {
     "createTitle": "Create hypothesis",
+    "noProject": "No project",
     "rawText": "Hypothesis text",
     "rawPlaceholder": "Describe your scientific or engineering idea...",
     "workspace": "Hypothesis Workspace",
@@ -244,6 +250,22 @@
     "CRITICAL": "Critical",
     "HIGH": "High importance",
     "EXTREME": "Extreme gap"
+  },
+  "account": {
+    "title": "Account",
+    "privateWorkspace": "Private research workspace",
+    "description": "Your projects, hypotheses and breakthrough sessions are visible only inside your workspace.",
+    "authRequired": "Authentication is not configured for this production environment. Private research data remains unavailable anonymously.",
+    "profile": "Profile",
+    "name": "Name",
+    "email": "Email",
+    "selectedLocale": "Selected locale",
+    "workspaceId": "Workspace ID",
+    "workspaceInfo": "Workspace information",
+    "projects": "Projects",
+    "hypotheses": "Hypotheses",
+    "breakthroughs": "Active breakthroughs",
+    "notSet": "Not set"
   },
   "admin": {
     "title": "Analysis Prompts",

@@ -1,10 +1,11 @@
 {
   "common": {
     "appName": "TheoryForge",
-    "dashboard": "Панель",
+    "dashboard": "Кабинет",
     "projects": "Проекты",
     "hypotheses": "Гипотезы",
     "settings": "Настройки",
+    "account": "Аккаунт",
     "newHypothesis": "Новая гипотеза",
     "createProject": "Создать проект",
     "startBreakthrough": "Начать поиск прорыва",
@@ -32,18 +33,23 @@
     "labLabel": "Исследовательская ИИ-лаборатория"
   },
   "dashboard": {
-    "title": "Исследовательская панель",
+    "title": "Личный кабинет",
     "subtitle": "Ваши проекты, гипотезы и активные сессии поиска прорыва.",
     "research": "Прогресс исследования",
     "functionality": "Работоспособность в реальности",
     "testability": "Проверяемость",
     "recentProjects": "Последние проекты",
     "recentHypotheses": "Последние гипотезы",
-    "activeBreakthroughs": "Активные поиски прорыва"
+    "myProjects": "Мои проекты",
+    "myHypotheses": "Мои гипотезы",
+    "activeBreakthroughs": "Активные прорывы",
+    "recentCalculations": "Последние расчёты",
+    "labLog": "Журнал лаборатории"
   },
   "projects": {"title": "Исследовательские проекты", "newTitle": "Название нового проекта", "empty": "Проектов пока нет."},
   "hypothesis": {
     "createTitle": "Создать гипотезу",
+    "noProject": "Без проекта",
     "rawText": "Текст гипотезы",
     "rawPlaceholder": "Опишите научную или инженерную идею...",
     "workspace": "Рабочая область гипотезы",
@@ -206,6 +212,22 @@
     "severity": {"info": "Информация", "success": "Успешно", "warning": "Внимание", "critical": "Критично"}
   },
   "settings": {"title": "Настройки", "preferredLanguage": "Предпочитаемый язык", "privacy": "Настройки приватности"},
+  "account": {
+    "title": "Аккаунт",
+    "privateWorkspace": "Личное исследовательское пространство",
+    "description": "Ваши проекты, гипотезы и сессии поиска прорыва доступны только внутри личного пространства.",
+    "authRequired": "В этом production-окружении авторизация пока не настроена. Анонимный доступ к личным исследовательским данным закрыт.",
+    "profile": "Профиль",
+    "name": "Имя",
+    "email": "Электронная почта",
+    "selectedLocale": "Выбранный язык",
+    "workspaceId": "Идентификатор пространства",
+    "workspaceInfo": "Информация о пространстве",
+    "projects": "Проекты",
+    "hypotheses": "Гипотезы",
+    "breakthroughs": "Активные прорывы",
+    "notSet": "Не указано"
+  },
   "admin": {"title": "Промпты анализа", "placeholder": "Управление промптами пока не подключено"},
   "labels": {
     "PHYSICALLY_POSSIBLE_ENGINEERING_BLOCKED": "Физически возможно, но инженерно заблокировано",

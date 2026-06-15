@@ -5,6 +5,7 @@ import {Prisma} from '@prisma/client';
 import {prisma} from '@/lib/db/prisma';
 import {localizeMockValue} from '@/lib/locale/mock-copy';
 import {discoverSourceCandidates} from '@/lib/sources/source-discovery';
+import {requireCurrentUser} from '@/lib/auth/current-user';
 
 export async function discoverSourcesAction(
   locale: string,
@@ -12,7 +13,8 @@ export async function discoverSourcesAction(
   conditionId?: string,
   _formData?: FormData
 ) {
-  const hypothesis = await prisma.hypothesis.findUnique({where: {id: hypothesisId}});
+  const user = await requireCurrentUser();
+  const hypothesis = await prisma.hypothesis.findFirst({where: {id: hypothesisId, ownerId: user.id}});
   if (!hypothesis) throw new Error('Hypothesis not found.');
 
   const condition = conditionId
@@ -40,7 +42,7 @@ export async function discoverSourcesAction(
 
   const breakthroughSession = condition
     ? await prisma.breakthroughSession.findFirst({
-        where: {hypothesisId, conditionId: condition.id},
+        where: {ownerId: user.id, hypothesisId, conditionId: condition.id},
         orderBy: {updatedAt: 'desc'},
       })
     : null;
