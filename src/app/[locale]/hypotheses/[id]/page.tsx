@@ -4,6 +4,7 @@ import {ProgressPanel} from '@/components/hypotheses/ProgressPanel';
 import {ConditionCard} from '@/components/hypotheses/ConditionCard';
 import {VisualSceneCards} from '@/components/visual-lab/VisualSceneCards';
 import {AnimatedVisualLab} from '@/components/visual-lab/AnimatedVisualLab';
+import {EngineeringVisualLab} from '@/components/engineering/EngineeringVisualLab';
 import {CalculationCard} from '@/components/calculations/CalculationCard';
 import {ParameterPlayground} from '@/components/calculations/ParameterPlayground';
 import {LabLogTimeline} from '@/components/lab-log/LabLogTimeline';
@@ -18,6 +19,7 @@ import {getLocalizedSourceSummary} from '@/lib/sources/source-discovery';
 import {isParameterCalculationInput} from '@/lib/calculations/order-of-magnitude';
 import {buildLabLog} from '@/lib/lab-log/build-lab-log';
 import {buildVisualModel} from '@/lib/visual-lab/build-visual-model';
+import {buildEngineeringModel} from '@/lib/engineering/build-engineering-model';
 import {runCalculationAction, runParameterCalculationAction} from '@/server/actions/calculations';
 import {discoverSourcesAction} from '@/server/actions/sources';
 import {getCurrentUser} from '@/lib/auth/current-user';
@@ -33,6 +35,7 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
   const sourceT = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'sources'});
   const labT = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'labLog'});
   const visualLabT = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'visualLab'});
+  const engineeringT = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'engineeringLab'});
   const user = await getCurrentUser();
   if (!user) redirect(`/${locale}/account`);
   const hypothesis = await prisma.hypothesis.findFirst({
@@ -170,6 +173,46 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
       connection: visualLabT('legend.connection'), progress: visualLabT('legend.progress'),
     },
   };
+  const engineeringModel = buildEngineeringModel({
+    locale,
+    hypothesis: {
+      id: hypothesis.id,
+      title: hypothesis.originalTitle,
+      text: hypothesis.originalText,
+      researchProgress: analysis.researchProgress,
+      functionalityProgress: analysis.functionalityProgress,
+      testabilityProgress: analysis.testabilityProgress,
+      confidence: analysis.confidence,
+    },
+    conditions: conditions.map(condition => ({
+      id: condition.id,
+      title: condition.title,
+      description: condition.description,
+      status: condition.status,
+      importance: condition.importance,
+      completionScore: condition.completionScore,
+      blockers: condition.blockers,
+      href: visualLabConditions.find(item => item.id === condition.id)?.href,
+    })),
+    calculations: visualLabCalculations,
+    sources: visualLabSources,
+    breakthroughSessions: visualLabBreakthroughs,
+  });
+  const engineeringLabels = {
+    kicker: engineeringT('kicker'), title: engineeringT('title'), description: engineeringT('description'),
+    artifactType: engineeringT('artifactType'), explodedView: engineeringT('explodedView'), assembledView: engineeringT('assembledView'),
+    resetCamera: engineeringT('resetCamera'), selectedModule: engineeringT('selectedModule'), moduleProgress: engineeringT('moduleProgress'),
+    linkedBlockers: engineeringT('linkedBlockers'), linkedCalculations: engineeringT('linkedCalculations'), sourceCandidates: engineeringT('sourceCandidates'),
+    activeBreakthroughs: engineeringT('activeBreakthroughs'), noLinkedItems: engineeringT('noLinkedItems'), open: engineeringT('open'),
+    gapOrders: engineeringT('gapOrders'), criticalModules: engineeringT('criticalModules'), charts: engineeringT('charts'), mobileHint: engineeringT('mobileHint'),
+    severity: {
+      info: engineeringT('severity.info'), success: engineeringT('severity.success'), warning: engineeringT('severity.warning'), critical: engineeringT('severity.critical'),
+    },
+    metrics: {
+      research: engineeringT('metrics.research'), functionality: engineeringT('metrics.functionality'), testability: engineeringT('metrics.testability'),
+      confidence: engineeringT('metrics.confidence'), evidence: engineeringT('metrics.evidence'),
+    },
+  };
   const labLogLabels = {
     title: labT('title'),
     workspaceTitle: labT('workspaceTitle'),
@@ -299,6 +342,10 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
           locale={locale}
           sources={visualLabSources}
         />
+      </section>
+
+      <section aria-label={t('tabs.engineering')} id="engineering-model">
+        <EngineeringVisualLab labels={engineeringLabels} model={engineeringModel} />
       </section>
 
       {visualScene && (
