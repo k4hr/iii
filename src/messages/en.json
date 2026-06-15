@@ -113,6 +113,18 @@
     "constraints": "Constraints",
     "measurements": "Measurements"
   },
+  "visualLab": {
+    "kicker": "DYNAMIC SYSTEM MODEL",
+    "title": "Visual Lab",
+    "description": "An animated systems view of the hypothesis, its dependencies, blockers, estimates, evidence candidates and active research paths.",
+    "confidence": "Confidence",
+    "gapOrders": "Gap orders",
+    "open": "Open linked workspace",
+    "more": "and {count} more",
+    "selected": "Selected node",
+    "nodeTypes": {"hypothesis": "Hypothesis", "condition": "Condition", "blocker": "Critical blocker", "calculation": "Calculation", "source": "Source candidate", "breakthrough": "Active breakthrough"},
+    "legend": {"title": "Legend", "hypothesis": "Hypothesis", "condition": "Condition", "blocker": "Critical blocker", "calculation": "Calculation", "source": "Source candidate", "connection": "Connection", "progress": "Progress"}
+  },
   "experiments": {
     "title": "Experiments",
     "equipment": "Required equipment",

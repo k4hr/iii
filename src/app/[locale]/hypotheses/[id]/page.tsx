@@ -3,6 +3,7 @@ import {prisma} from '@/lib/db/prisma';
 import {ProgressPanel} from '@/components/hypotheses/ProgressPanel';
 import {ConditionCard} from '@/components/hypotheses/ConditionCard';
 import {VisualSceneCards} from '@/components/visual-lab/VisualSceneCards';
+import {AnimatedVisualLab} from '@/components/visual-lab/AnimatedVisualLab';
 import {CalculationCard} from '@/components/calculations/CalculationCard';
 import {ParameterPlayground} from '@/components/calculations/ParameterPlayground';
 import {LabLogTimeline} from '@/components/lab-log/LabLogTimeline';
@@ -28,6 +29,7 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
   const calc = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'calculations'});
   const sourceT = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'sources'});
   const labT = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'labLog'});
+  const visualLabT = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'visualLab'});
   const hypothesis = await prisma.hypothesis.findUnique({
     where: {id},
     include: {
@@ -39,6 +41,7 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
       versions: true,
       simulationRuns: true,
       calculationRuns: {orderBy: {createdAt: 'desc'}, include: {condition: true}},
+      breakthroughSessions: {orderBy: {createdAt: 'desc'}},
     },
   });
 
@@ -95,6 +98,31 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
   const calculationHistory = latestParameterRun
     ? hypothesis.calculationRuns.filter(calculation => calculation.id !== latestParameterRun.id)
     : hypothesis.calculationRuns;
+  const visualLabCalculations = hypothesis.calculationRuns.map(calculation => {
+    const result = jsonRecord(calculation.resultJson);
+    return {
+      id: calculation.id,
+      conditionId: calculation.conditionId,
+      title: calculation.title,
+      gapOrders: jsonNumber(result.gapOrders),
+      gapLevel: jsonString(result.gapLevel),
+      href: `/${locale}/hypotheses/${hypothesis.id}#calculations`,
+    };
+  });
+  const visualLabLabels = {
+    kicker: visualLabT('kicker'), title: visualLabT('title'), description: visualLabT('description'),
+    confidence: visualLabT('confidence'), gapOrders: visualLabT('gapOrders'), open: visualLabT('open'),
+    more: visualLabT('more'), selected: visualLabT('selected'),
+    nodeTypes: {
+      hypothesis: visualLabT('nodeTypes.hypothesis'), condition: visualLabT('nodeTypes.condition'), blocker: visualLabT('nodeTypes.blocker'),
+      calculation: visualLabT('nodeTypes.calculation'), source: visualLabT('nodeTypes.source'), breakthrough: visualLabT('nodeTypes.breakthrough'),
+    },
+    legend: {
+      title: visualLabT('legend.title'), hypothesis: visualLabT('legend.hypothesis'), condition: visualLabT('legend.condition'),
+      blocker: visualLabT('legend.blocker'), calculation: visualLabT('legend.calculation'), source: visualLabT('legend.source'),
+      connection: visualLabT('legend.connection'), progress: visualLabT('legend.progress'),
+    },
+  };
   const labLogLabels = {
     title: labT('title'),
     workspaceTitle: labT('workspaceTitle'),
@@ -128,7 +156,7 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
 
       <ProgressPanel analysis={analysis} blockers={blockers} locale={locale} t={(key) => t(key)} />
 
-      <section>
+      <section id="calculations">
         <SectionHeader code="CALC-01" title={calc('title')} detail={`${hypothesis.calculationRuns.length} ${calc('history')}`} />
         <GlassPanel glow className="data-grid mt-5 p-5 sm:p-6">
           <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
@@ -206,10 +234,42 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
         <GlassPanel className="data-grid mt-5 p-4 sm:p-6">
           <div className="relative space-y-3 lg:ml-5 lg:border-l lg:border-cyan-200/15 lg:pl-8">
             {conditions.map((condition, index) => (
-              <ConditionCard key={condition.id} condition={condition} locale={locale} labels={labels} index={index} />
+              <div id={`condition-${condition.id}`} key={condition.id}>
+                <ConditionCard condition={condition} locale={locale} labels={labels} index={index} />
+              </div>
             ))}
           </div>
         </GlassPanel>
+      </section>
+
+      <section id="visual-lab">
+        <AnimatedVisualLab
+          breakthroughSessions={hypothesis.breakthroughSessions.map(session => ({
+            id: session.id,
+            conditionId: session.conditionId,
+            title: localizeMockValue(session, locale).title,
+            progressScore: session.progressScore,
+            href: `/${locale}/breakthroughs/${session.id}`,
+          }))}
+          calculations={visualLabCalculations}
+          conditions={conditions.map(condition => {
+            const session = hypothesis.breakthroughSessions.find(item => item.conditionId === condition.id);
+            return {
+              id: condition.id,
+              parentId: condition.parentId,
+              title: condition.title,
+              status: condition.status,
+              importance: condition.importance,
+              confidence: condition.confidence,
+              completionScore: condition.completionScore,
+              href: session ? `/${locale}/breakthroughs/${session.id}` : `/${locale}/hypotheses/${hypothesis.id}#condition-${condition.id}`,
+            };
+          })}
+          hypothesis={{id: hypothesis.id, title: hypothesis.originalTitle, progress: analysis.researchProgress, confidence: analysis.confidence, href: `/${locale}/hypotheses/${hypothesis.id}`}}
+          labels={visualLabLabels}
+          locale={locale}
+          sources={sources.map(source => ({id: source.id, conditionId: source.conditionId, title: source.title, relationship: source.relationshipToHypothesis, href: `/${locale}/hypotheses/${hypothesis.id}#sources`}))}
+        />
       </section>
 
       {visualScene && (
@@ -241,7 +301,7 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
         </div>
       </section>
 
-      <section>
+      <section id="sources">
         <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
           <div><div className="mono-label">SRC-04</div><h2 className="section-heading mt-2">{sourceT('title')}</h2><p className="mt-3 max-w-3xl text-xs leading-6 text-[#78999b]">{sourceT('description')}</p></div>
           <form action={discoverSourcesAction.bind(null, locale, hypothesis.id, undefined)}>
@@ -286,4 +346,16 @@ function getCalculationGapLabelFromRun(resultJson: unknown, locale: string): str
   if (!resultJson || typeof resultJson !== 'object' || Array.isArray(resultJson)) return '—';
   const gapLevel = (resultJson as {gapLevel?: unknown}).gapLevel;
   return typeof gapLevel === 'string' ? getEnumLabel(gapLevel, locale) : '—';
+}
+
+function jsonRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function jsonNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function jsonString(value: unknown): string | null {
+  return typeof value === 'string' ? value : null;
 }
