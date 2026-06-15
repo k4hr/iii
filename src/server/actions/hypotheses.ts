@@ -1,7 +1,7 @@
 'use server';
 
 import {redirect} from 'next/navigation';
-import {Prisma} from '@prisma/client';
+import {Prisma, Scale} from '@prisma/client';
 import {prisma} from '@/lib/db/prisma';
 import {detectLanguage} from '@/lib/ai/detect-language';
 import {createCanonicalHypothesis} from '@/lib/ai/create-canonical-hypothesis';
@@ -23,6 +23,15 @@ function toPrismaJsonArray(value: unknown): Prisma.InputJsonValue {
 
 function jsonValueOrObject(value: unknown): Prisma.InputJsonValue {
   return toPrismaJson(value, {});
+}
+
+function normalizeScale(value: unknown): Scale {
+  return typeof value === 'string' && Object.values(Scale).includes(value as Scale) ? value as Scale : Scale.UNKNOWN;
+}
+
+function getVisualSceneValue<T>(scene: Record<string, unknown>, key: string, fallback: T): T {
+  const value = scene[key];
+  return value === undefined || value === null ? fallback : value as T;
 }
 
 export async function createProjectAction(locale: string, formData: FormData) {
@@ -87,7 +96,7 @@ export async function createHypothesisAction(locale: string, formData: FormData)
       data: {
         hypothesisId: createdHypothesis.id,
         canonicalJson: toPrismaJson(mock.canonicalJson),
-        scale: mock.scale,
+        scale: normalizeScale(mock.scale),
         verdictLevel: mock.verdictLevel,
         confidence: mock.confidence,
         researchProgress: mock.researchProgress,
@@ -143,12 +152,12 @@ export async function createHypothesisAction(locale: string, formData: FormData)
     await tx.visualScene.create({data: {
       hypothesisId: createdHypothesis.id,
       analysisId: analysis.id,
-      sceneType: mock.visualScene.sceneType,
-      scale: mock.visualScene.scale,
-      objectsJson: toPrismaJsonArray(mock.visualScene.objectsJson),
-      variablesJson: toPrismaJsonArray(mock.visualScene.variablesJson),
-      constraintsJson: toPrismaJsonArray(mock.visualScene.constraintsJson),
-      measurementsJson: toPrismaJsonArray(mock.visualScene.measurementsJson),
+      sceneType: getVisualSceneValue(mock.visualScene as Record<string, unknown>, 'sceneType', 'generic_model'),
+      scale: normalizeScale(getVisualSceneValue(mock.visualScene as Record<string, unknown>, 'scale', Scale.UNKNOWN)),
+      objectsJson: toPrismaJsonArray(getVisualSceneValue(mock.visualScene as Record<string, unknown>, 'objectsJson', [])),
+      variablesJson: toPrismaJsonArray(getVisualSceneValue(mock.visualScene as Record<string, unknown>, 'variablesJson', [])),
+      constraintsJson: toPrismaJsonArray(getVisualSceneValue(mock.visualScene as Record<string, unknown>, 'constraintsJson', [])),
+      measurementsJson: toPrismaJsonArray(getVisualSceneValue(mock.visualScene as Record<string, unknown>, 'measurementsJson', [])),
     }});
 
     const experimentData: Prisma.ExperimentProposalCreateManyInput[] = mock.experiments.map(e => ({
