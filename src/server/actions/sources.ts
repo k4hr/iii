@@ -51,7 +51,7 @@ export async function discoverSourcesAction(
     await Promise.all(newCandidates.map(candidate => tx.sourceReference.create({
       data: {
         hypothesisId,
-        conditionId: condition?.id,
+        ...(condition?.id ? {conditionId: condition.id} : {}),
         title: candidate.title,
         url: candidate.url,
         sourceType: candidate.sourceType,
@@ -68,7 +68,7 @@ export async function discoverSourcesAction(
           type: 'SOURCE_ADDED',
           content: {
             message: ru ? 'Кандидаты источников добавлены для проверки.' : 'Source candidates were added for verification.',
-            conditionId: condition?.id,
+            ...(condition?.id ? {conditionId: condition.id} : {}),
             discoveredCount: candidates.length,
             addedCount: newCandidates.length,
             relationships: newCandidates.map(candidate => candidate.relationshipToHypothesis),

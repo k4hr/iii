@@ -51,7 +51,7 @@ export async function registerAction(locale: string, formData: FormData) {
     await prisma.user.create({
       data: {
         email: parsed.data.email,
-        name: parsed.data.name,
+        ...(parsed.data.name ? {name: parsed.data.name} : {}),
         passwordHash: await hash(parsed.data.password, 12),
         locale: normalizedLocale === 'ru' ? 'RU' : 'EN',
       },

@@ -58,8 +58,8 @@ export async function runCalculationAction(
     const created = await tx.calculationRun.create({
       data: {
         hypothesisId,
-        conditionId: condition?.id,
-        breakthroughSessionId: breakthroughSession?.id,
+        ...(condition?.id ? {conditionId: condition.id} : {}),
+        ...(breakthroughSession?.id ? {breakthroughSessionId: breakthroughSession.id} : {}),
         title: calculation.title,
         calculationType: calculation.calculationType,
         inputJson: calculation.input as Prisma.InputJsonValue,
@@ -154,8 +154,8 @@ export async function runParameterCalculationAction(
     const created = await tx.calculationRun.create({
       data: {
         hypothesisId,
-        conditionId: condition?.id,
-        breakthroughSessionId: breakthroughSession?.id,
+        ...(condition?.id ? {conditionId: condition.id} : {}),
+        ...(breakthroughSession?.id ? {breakthroughSessionId: breakthroughSession.id} : {}),
         title: estimate.title,
         calculationType: estimate.calculationType,
         inputJson: estimate.input as Prisma.InputJsonValue,
