@@ -366,6 +366,7 @@ model VisualScene {
   variablesJson   Json
   constraintsJson Json
   measurementsJson Json
+  engineeringModelJson Json?
   createdAt       DateTime @default(now())
 }
 

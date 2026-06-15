@@ -2,9 +2,9 @@
 
 import {animate, createTimeline, stagger} from 'animejs';
 import {useEffect, useMemo, useRef} from 'react';
-import type {EngineeringModule} from '@/lib/engineering/build-engineering-model';
+import type {EngineeringRenderModule} from '@/lib/engineering/build-engineering-model';
 
-export function EngineeringBlueprintOverlay({modules, selectedModuleId, onSelectModule}: {modules: EngineeringModule[]; selectedModuleId: string; onSelectModule: (id: string) => void}) {
+export function EngineeringBlueprintOverlay({modules, selectedModuleId, onSelectModule}: {modules: EngineeringRenderModule[]; selectedModuleId: string; onSelectModule: (id: string) => void}) {
   const rootRef = useRef<HTMLDivElement>(null);
   const visible = useMemo(() => modules.slice(0, 6), [modules]);
 
@@ -75,10 +75,10 @@ export function EngineeringBlueprintOverlay({modules, selectedModuleId, onSelect
             type="button"
           >
             <span className="flex items-center justify-between gap-2">
-              <span className="truncate font-mono text-[8px] tracking-[.1em] text-cyan-50/65 uppercase">{module.label}</span>
+              <span className="truncate font-mono text-[8px] tracking-[.1em] text-cyan-50/65 uppercase">{module.name}</span>
               <span className="h-1.5 w-1.5 shrink-0 rounded-full" data-blueprint-marker style={{background: module.color, boxShadow: `0 0 10px ${module.color}`, opacity: 0}} />
             </span>
-            <span className="mt-1.5 block font-mono text-[8px] text-cyan-100/35">M-{String(index + 1).padStart(2, '0')} / {module.progress}%</span>
+            <span className="mt-1.5 block font-mono text-[8px] text-cyan-100/35">M-{String(index + 1).padStart(2, '0')} / {module.feasibilityScore}%</span>
           </button>
         );
       })}

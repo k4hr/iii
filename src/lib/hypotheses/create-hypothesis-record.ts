@@ -2,6 +2,7 @@ import {HypothesisStatus, Locale, PrismaClient, Scale} from '@prisma/client';
 import {analyzeHypothesisMock} from '@/lib/ai/analyze-hypothesis';
 import {createCanonicalHypothesis} from '@/lib/ai/create-canonical-hypothesis';
 import {detectLanguage} from '@/lib/ai/detect-language';
+import {generateEngineeringModel} from '@/lib/engineering/generate-engineering-model';
 import {routeLocaleToPrisma} from '@/lib/locale/locale';
 import {
   normalizeConditionImportance,
@@ -18,7 +19,7 @@ import {
   normalizeSourceType,
   normalizeVerdictLevel,
 } from '@/lib/prisma/normalize-enums';
-import {toPrismaJsonArray, toPrismaJsonObject} from '@/lib/prisma/safe-json';
+import {toPrismaJson, toPrismaJsonArray, toPrismaJsonObject} from '@/lib/prisma/safe-json';
 
 export type CreateHypothesisRecordInput = {
   ownerId: string;
@@ -40,7 +41,7 @@ export async function createHypothesisRecord(prisma: PrismaClient, input: Create
   const mock = analyzeHypothesisMock({title, text: rawText, analysisLocale});
   const scene: Record<string, unknown> = isRecord(mock.visualScene) ? mock.visualScene : {};
 
-  return prisma.$transaction(async tx => {
+  const created = await prisma.$transaction(async tx => {
     const hypothesis = await tx.hypothesis.create({
       data: {
         ownerId: input.ownerId,
@@ -168,6 +169,55 @@ export async function createHypothesisRecord(prisma: PrismaClient, input: Create
 
     return {hypothesisId: hypothesis.id, analysisId: analysis.id, analysisScale: analysis.scale, visualScene};
   });
+
+  const [conditions, sources] = await Promise.all([
+    prisma.hypothesisCondition.findMany({where: {hypothesisId: created.hypothesisId}, orderBy: {createdAt: 'asc'}}),
+    prisma.sourceReference.findMany({where: {hypothesisId: created.hypothesisId}, orderBy: {createdAt: 'asc'}}),
+  ]);
+  const localizedAnalysis = mock.translations.find(item => normalizeLocale(item.locale, analysisLocale) === analysisLocale) ?? mock.translations[0];
+  const engineeringModel = await generateEngineeringModel({
+    locale: analysisLocale === Locale.RU ? 'ru' : 'en',
+    hypothesis: {id: created.hypothesisId, title, text: rawText},
+    analysis: {
+      summary: localizedAnalysis?.summary,
+      formalizedClaim: localizedAnalysis?.formalizedClaim,
+      knownScience: localizedAnalysis?.knownScience,
+      physicalConstraints: localizedAnalysis?.physicalConstraints,
+      engineeringConstraints: localizedAnalysis?.engineeringConstraints,
+      contradictions: localizedAnalysis?.contradictions,
+      unknowns: localizedAnalysis?.unknowns,
+      mainBlockers: mock.mainBlockersJson,
+      researchProgress: mock.researchProgress,
+      functionalityProgress: mock.functionalityProgress,
+      testabilityProgress: mock.testabilityProgress,
+      confidence: mock.confidence,
+    },
+    conditions: conditions.map(condition => ({
+      id: condition.id,
+      title: condition.title,
+      description: condition.description,
+      status: condition.status,
+      importance: condition.importance,
+      completionScore: condition.completionScore,
+      blockers: condition.blockers,
+      parentId: condition.parentId,
+    })),
+    calculations: [],
+    sources: sources.map(source => ({
+      id: source.id,
+      conditionId: source.conditionId,
+      title: source.title,
+      relationship: source.relationshipToHypothesis,
+    })),
+    breakthroughSessions: [],
+  });
+
+  await prisma.visualScene.update({
+    where: {id: created.visualScene.id},
+    data: {engineeringModelJson: toPrismaJson(engineeringModel)},
+  });
+
+  return created;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

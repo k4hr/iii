@@ -173,6 +173,9 @@
     "criticalModules": "Critical blockers",
     "charts": "Engineering telemetry",
     "mobileHint": "Drag to rotate, pinch to zoom, and tap a module to inspect it.",
+    "abstractNotice": "This hypothesis is primarily abstract. The 3D view shows a structural dependency model until a measurable physical carrier is defined.",
+    "engineeringIntent": "Engineering intent",
+    "nextEngineeringStep": "Next engineering step",
     "severity": {"info": "Under review", "success": "Ready", "warning": "Engineering gap", "critical": "Critical blocker"},
     "metrics": {"research": "Research", "functionality": "Functionality", "testability": "Testability", "confidence": "Confidence", "evidence": "Evidence"}
   },

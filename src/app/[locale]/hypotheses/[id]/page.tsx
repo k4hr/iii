@@ -19,7 +19,8 @@ import {getLocalizedSourceSummary} from '@/lib/sources/source-discovery';
 import {isParameterCalculationInput} from '@/lib/calculations/order-of-magnitude';
 import {buildLabLog} from '@/lib/lab-log/build-lab-log';
 import {buildVisualModel} from '@/lib/visual-lab/build-visual-model';
-import {buildEngineeringModel} from '@/lib/engineering/build-engineering-model';
+import {parseEngineeringModel} from '@/lib/engineering/engineering-model-schema';
+import {enrichEngineeringModelContext, synthesizeEngineeringModelFallback} from '@/lib/engineering/generate-engineering-model';
 import {runCalculationAction, runParameterCalculationAction} from '@/server/actions/calculations';
 import {discoverSourcesAction} from '@/server/actions/sources';
 import {getCurrentUser} from '@/lib/auth/current-user';
@@ -173,12 +174,22 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
       connection: visualLabT('legend.connection'), progress: visualLabT('legend.progress'),
     },
   };
-  const engineeringModel = buildEngineeringModel({
+  const engineeringInput = {
     locale,
     hypothesis: {
       id: hypothesis.id,
       title: hypothesis.originalTitle,
       text: hypothesis.originalText,
+    },
+    analysis: {
+      summary: translation.summary,
+      formalizedClaim: translation.formalizedClaim,
+      knownScience: translation.knownScience,
+      physicalConstraints: translation.physicalConstraints,
+      engineeringConstraints: translation.engineeringConstraints,
+      contradictions: translation.contradictions,
+      unknowns: translation.unknowns,
+      mainBlockers: analysis.mainBlockersJson,
       researchProgress: analysis.researchProgress,
       functionalityProgress: analysis.functionalityProgress,
       testabilityProgress: analysis.testabilityProgress,
@@ -192,12 +203,34 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
       importance: condition.importance,
       completionScore: condition.completionScore,
       blockers: condition.blockers,
-      href: visualLabConditions.find(item => item.id === condition.id)?.href,
+      parentId: condition.parentId,
     })),
-    calculations: visualLabCalculations,
-    sources: visualLabSources,
-    breakthroughSessions: visualLabBreakthroughs,
-  });
+    calculations: hypothesis.calculationRuns.map(calculation => ({
+      id: calculation.id,
+      conditionId: calculation.conditionId,
+      title: calculation.title,
+      resultJson: calculation.resultJson,
+      gapOrders: jsonNumber(jsonRecord(calculation.resultJson).gapOrders),
+    })),
+    sources: sources.map(source => ({
+      id: source.id,
+      conditionId: source.conditionId,
+      title: source.title,
+      relationship: source.relationshipToHypothesis,
+    })),
+    breakthroughSessions: visualLabBreakthroughs.map(session => ({
+      id: session.id,
+      conditionId: session.conditionId,
+      title: session.title,
+      progressScore: session.progressScore,
+    })),
+  };
+  const storedEngineeringModel = localeMatchesPrismaLocale(locale, hypothesis.analysisLocale)
+    ? parseEngineeringModel(hypothesis.visualScenes[0]?.engineeringModelJson)
+    : null;
+  const engineeringModel = storedEngineeringModel
+    ? enrichEngineeringModelContext(storedEngineeringModel, engineeringInput)
+    : synthesizeEngineeringModelFallback(engineeringInput);
   const engineeringLabels = {
     kicker: engineeringT('kicker'), title: engineeringT('title'), description: engineeringT('description'),
     artifactType: engineeringT('artifactType'), explodedView: engineeringT('explodedView'), assembledView: engineeringT('assembledView'),
@@ -205,6 +238,7 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
     linkedBlockers: engineeringT('linkedBlockers'), linkedCalculations: engineeringT('linkedCalculations'), sourceCandidates: engineeringT('sourceCandidates'),
     activeBreakthroughs: engineeringT('activeBreakthroughs'), noLinkedItems: engineeringT('noLinkedItems'), open: engineeringT('open'),
     gapOrders: engineeringT('gapOrders'), criticalModules: engineeringT('criticalModules'), charts: engineeringT('charts'), mobileHint: engineeringT('mobileHint'),
+    abstractNotice: engineeringT('abstractNotice'), nextEngineeringStep: engineeringT('nextEngineeringStep'), engineeringIntent: engineeringT('engineeringIntent'),
     severity: {
       info: engineeringT('severity.info'), success: engineeringT('severity.success'), warning: engineeringT('severity.warning'), critical: engineeringT('severity.critical'),
     },
@@ -345,7 +379,16 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
       </section>
 
       <section aria-label={t('tabs.engineering')} id="engineering-model">
-        <EngineeringVisualLab labels={engineeringLabels} model={engineeringModel} />
+        <EngineeringVisualLab
+          labels={engineeringLabels}
+          model={engineeringModel}
+          records={{
+            conditions: visualLabConditions.map(item => ({id: item.id, title: item.title, href: item.href})),
+            calculations: visualLabCalculations.map(item => ({id: item.id, title: item.title, href: item.href})),
+            sources: visualLabSources.map(item => ({id: item.id, title: item.title, href: item.href})),
+            breakthroughs: visualLabBreakthroughs.map(item => ({id: item.id, conditionId: item.conditionId, title: item.title, href: item.href})),
+          }}
+        />
       </section>
 
       {visualScene && (
@@ -434,4 +477,8 @@ function jsonNumber(value: unknown): number | null {
 
 function jsonString(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
+}
+
+function localeMatchesPrismaLocale(locale: string, analysisLocale: string): boolean {
+  return (locale.toLowerCase() === 'ru' ? 'RU' : 'EN') === analysisLocale;
 }

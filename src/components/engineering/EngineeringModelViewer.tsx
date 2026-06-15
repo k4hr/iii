@@ -1,14 +1,15 @@
 'use client';
 
 import {Canvas, useFrame, useThree} from '@react-three/fiber';
-import {Edges, Grid, Html, OrbitControls, useCursor} from '@react-three/drei';
+import {Edges, Grid, Html, Line, OrbitControls, useCursor} from '@react-three/drei';
 import {useEffect, useMemo, useRef, useState} from 'react';
 import * as THREE from 'three';
 import type {OrbitControls as OrbitControlsImpl} from 'three-stdlib';
-import type {EngineeringArtifactType, EngineeringGeometry, EngineeringModel, EngineeringModule, Vector3Tuple} from '@/lib/engineering/build-engineering-model';
+import type {CanonicalEngineeringModel, CanonicalEngineeringModule} from '@/lib/engineering/engineering-model-schema';
+import {buildEngineeringRenderModules, type EngineeringRenderModule, type Vector3Tuple} from '@/lib/engineering/build-engineering-model';
 
 type EngineeringModelViewerProps = {
-  model: EngineeringModel;
+  model: CanonicalEngineeringModel;
   selectedModuleId: string;
   exploded: boolean;
   resetSignal: number;
@@ -16,7 +17,7 @@ type EngineeringModelViewerProps = {
 };
 
 type PartSpec = {
-  geometry: EngineeringGeometry | 'cone';
+  geometry: 'box' | 'cylinder' | 'sphere' | 'torus' | 'cone';
   position: Vector3Tuple;
   scale: Vector3Tuple;
   rotation?: Vector3Tuple;
@@ -25,6 +26,9 @@ type PartSpec = {
 };
 
 export function EngineeringModelViewer({model, selectedModuleId, exploded, resetSignal, onSelectModule}: EngineeringModelViewerProps) {
+  const modules = useMemo(() => buildEngineeringRenderModules(model), [model]);
+  const moduleMap = useMemo(() => new Map(modules.map(module => [module.id, module])), [modules]);
+
   return (
     <div className="relative h-[430px] w-full overflow-hidden rounded-2xl bg-[radial-gradient(circle_at_50%_42%,rgba(27,209,201,.09),transparent_42%),linear-gradient(180deg,#030a0c,#010405)] sm:h-[560px]">
       <Canvas camera={{position: [6, 4, 7], fov: 42, near: .1, far: 100}} dpr={[1, 1.5]} gl={{antialias: true, alpha: true}}>
@@ -36,15 +40,14 @@ export function EngineeringModelViewer({model, selectedModuleId, exploded, reset
         <pointLight color="#34d399" intensity={16} position={[4, -2, -2]} distance={9} />
 
         <group rotation={[0, -.35, 0]}>
-          {model.modules.map(module => (
-            <ModuleMesh
-              artifactType={model.artifactType}
-              exploded={exploded}
-              key={module.id}
-              module={module}
-              onSelect={onSelectModule}
-              selected={selectedModuleId === module.id}
-            />
+          {model.interfaces.map((link, index) => {
+            const from = moduleMap.get(link.fromModuleId);
+            const to = moduleMap.get(link.toModuleId);
+            if (!from || !to) return null;
+            return <InterfaceLine exploded={exploded} from={from} key={`${link.fromModuleId}:${link.toModuleId}:${index}`} to={to} type={link.type} />;
+          })}
+          {modules.map(module => (
+            <ModuleMesh exploded={exploded} key={module.id} module={module} onSelect={onSelectModule} selected={selectedModuleId === module.id} />
           ))}
         </group>
 
@@ -54,13 +57,13 @@ export function EngineeringModelViewer({model, selectedModuleId, exploded, reset
       </Canvas>
 
       <div className="pointer-events-none absolute inset-0 rounded-2xl border border-cyan-100/[0.08] shadow-[inset_0_0_70px_rgba(18,204,194,.035)]" />
-      <div className="pointer-events-none absolute left-4 top-4 font-mono text-[8px] tracking-[.18em] text-cyan-100/35 uppercase">R3F / PROCEDURAL ASSEMBLY</div>
+      <div className="pointer-events-none absolute left-4 top-4 font-mono text-[8px] tracking-[.18em] text-cyan-100/35 uppercase">CANONICAL MODEL / PROCEDURAL ASSEMBLY</div>
       <div className="pointer-events-none absolute bottom-4 right-4 text-right font-mono text-[8px] leading-4 tracking-[.12em] text-cyan-100/30 uppercase">X/Y/Z engineering coordinates<br />drag rotate / wheel zoom / shift pan</div>
     </div>
   );
 }
 
-function ModuleMesh({artifactType, module, selected, exploded, onSelect}: {artifactType: EngineeringArtifactType; module: EngineeringModule; selected: boolean; exploded: boolean; onSelect: (id: string) => void}) {
+function ModuleMesh({module, selected, exploded, onSelect}: {module: EngineeringRenderModule; selected: boolean; exploded: boolean; onSelect: (id: string) => void}) {
   const groupRef = useRef<THREE.Group>(null);
   const [hovered, setHovered] = useState(false);
   const target = useMemo(() => new THREE.Vector3(...(exploded ? module.explodedPosition : module.position)), [exploded, module.explodedPosition, module.position]);
@@ -73,23 +76,20 @@ function ModuleMesh({artifactType, module, selected, exploded, onSelect}: {artif
     groupRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 1 - Math.exp(-delta * 8));
   });
 
-  const stop = (event: {stopPropagation: () => void}) => event.stopPropagation();
-  const labelY = Math.max(.75, module.scale[1] + .42);
-
   return (
     <group
-      onClick={event => { stop(event); onSelect(module.id); }}
-      onPointerOut={event => { stop(event); setHovered(false); }}
-      onPointerOver={event => { stop(event); setHovered(true); }}
+      onClick={event => { event.stopPropagation(); onSelect(module.id); }}
+      onPointerOut={event => { event.stopPropagation(); setHovered(false); }}
+      onPointerOver={event => { event.stopPropagation(); setHovered(true); }}
       position={module.position}
       ref={groupRef}
     >
-      <ArtifactModuleGeometry artifactType={artifactType} highlighted={selected || hovered} module={module} />
-      <StatusBeacon module={module} y={labelY - .18} />
+      <HintGeometry highlighted={selected || hovered} module={module} />
+      <StatusBeacon module={module} />
       {(selected || hovered) && (
-        <Html center position={[0, labelY, 0]} style={{pointerEvents: 'none'}} transform={false}>
+        <Html center position={[0, module.scale[1] + .52, 0]} style={{pointerEvents: 'none'}} transform={false}>
           <div className="whitespace-nowrap rounded border border-cyan-100/20 bg-[#02090b]/90 px-2 py-1 font-mono text-[8px] tracking-[.08em] text-cyan-50/80 uppercase shadow-[0_0_18px_rgba(34,211,201,.14)] backdrop-blur-md">
-            {module.label} / {module.progress}%
+            {module.name} / {module.feasibilityScore}%
           </div>
         </Html>
       )}
@@ -97,12 +97,30 @@ function ModuleMesh({artifactType, module, selected, exploded, onSelect}: {artif
   );
 }
 
-function ArtifactModuleGeometry({artifactType, module, highlighted}: {artifactType: EngineeringArtifactType; module: EngineeringModule; highlighted: boolean}) {
-  const parts = moduleParts(artifactType, module);
-  return <>{parts.map((part, index) => <ModulePart highlighted={highlighted} key={`${module.key}:${index}`} module={module} part={part} />)}</>;
+function HintGeometry({module, highlighted}: {module: EngineeringRenderModule; highlighted: boolean}) {
+  return <>{partsForHint(module).map((part, index) => <ModulePart highlighted={highlighted} key={`${module.id}:${index}`} module={module} part={part} />)}</>;
 }
 
-function ModulePart({module, part, highlighted}: {module: EngineeringModule; part: PartSpec; highlighted: boolean}) {
+function partsForHint(module: EngineeringRenderModule): PartSpec[] {
+  const [x, y, z] = module.scale;
+  switch (module.geometryHint) {
+    case 'core': return [sphere([0, 0, 0], [x, y, z]), torus([0, 0, 0], [x * 1.15, Math.max(.05, x * .08), z], [Math.PI / 2, 0, 0])];
+    case 'shell': return [box([0, 0, 0], [x * 2, y * 2, z * 2], .24, true), box([0, 0, 0], [x * 1.55, y * 1.55, z * 1.55], .5)];
+    case 'ring': return [torus([0, 0, 0], [x, Math.max(.08, y), z]), torus([0, 0, 0], [x * .72, Math.max(.05, y * .55), z * .72])];
+    case 'panel': return [box([0, 0, 0], [x * 2, y * 2, z * 2]), ...[-.45, 0, .45].map(offset => box([offset * x, 0, -z * 1.12], [x * .18, y * 1.35, z * .18]))];
+    case 'arm': return [cylinder([0, .35, 0], [x, y * .95, z], [0, 0, -.16]), cylinder([.16, -.55, 0], [x * .82, y * .75, z * .82], [0, 0, .12]), sphere([-.12, y * .62, 0], [x * 1.3, x * 1.3, z * 1.3])];
+    case 'leg': return [cylinder([0, .42, 0], [x, y, z]), cylinder([.08, -.72, 0], [x * .86, y * .78, z * .86]), box([.08, -y * .92, -.12], [x * 1.7, y * .18, z * 2.2])];
+    case 'rotor': return [torus([0, 0, 0], [x, Math.max(.05, y), z], [Math.PI / 2, 0, 0]), box([0, 0, 0], [x * 1.9, y * .35, z * .12]), box([0, 0, 0], [x * .12, y * .35, z * 1.9])];
+    case 'tank': return [cylinder([0, 0, 0], [x, y * 1.7, z]), sphere([0, y * .85, 0], [x, x, z]), sphere([0, -y * .85, 0], [x, x, z])];
+    case 'cell': return [-.45, 0, .45].flatMap(column => [-.32, .32].map(depth => cylinder([column * x * 2, 0, depth * z * 2], [x * .72, y * 1.7, z * .72])));
+    case 'probe': return [cylinder([0, 0, 0], [x, y * 1.5, z]), sphere([0, y * .82, 0], [x * 1.35, x * 1.35, z * 1.35]), cone([0, -y * .92, 0], [x * 1.1, y * .55, z * 1.1], [0, 0, Math.PI])];
+    case 'tube': return [cylinder([0, 0, 0], [x, y * 1.45, z]), torus([0, y * .55, 0], [x * 1.08, x * .11, z], [Math.PI / 2, 0, 0]), cone([0, -y * .9, 0], [x * 1.15, y * .62, z * 1.15], [0, 0, Math.PI])];
+    case 'block': return [box([0, 0, 0], [x * 2, y * 2, z * 2]), box([0, y * .72, 0], [x * 1.35, y * .16, z * 1.35])];
+    default: return [box([0, 0, 0], [x * 1.8, y * 1.8, z * 1.8]), sphere([0, y * .65, 0], [x * .38, x * .38, z * .38])];
+  }
+}
+
+function ModulePart({module, part, highlighted}: {module: EngineeringRenderModule; part: PartSpec; highlighted: boolean}) {
   return (
     <mesh castShadow position={part.position} rotation={part.rotation ?? [0, 0, 0]} scale={part.geometry === 'sphere' ? part.scale : [1, 1, 1]}>
       <PartGeometry part={part} />
@@ -120,62 +138,25 @@ function PartGeometry({part}: {part: PartSpec}) {
   return <boxGeometry args={part.scale} />;
 }
 
-function moduleParts(type: EngineeringArtifactType, module: EngineeringModule): PartSpec[] {
-  const key = module.key;
-  if (type === 'flying_vehicle') {
-    if (key === 'body') return [box([0, 0, 0], [3.25, .68, 1.45]), box([0, -.12, 1.02], [2.1, .38, .65]), box([0, -.1, -1.02], [2.35, .42, .65])];
-    if (key === 'cabin') return [sphere([0, 0, 0], [.9, .48, .82]), box([0, -.22, .12], [1.72, .35, 1.3])];
-    if (key === 'lift') return [box([-1.95, 0, 0], [1.35, .13, .76]), box([1.95, 0, 0], [1.35, .13, .76]), ...[-2.45, 2.45].flatMap(x => [-.48, .48].map(z => torus([x, .08, z], [.38, .045, .38], [Math.PI / 2, 0, 0])))];
-    if (key === 'propulsion') return [cylinder([-.88, 0, .88], [.3, .82, .3], [Math.PI / 2, 0, 0]), cylinder([.88, 0, .88], [.3, .82, .3], [Math.PI / 2, 0, 0]), cone([-.88, 0, 1.35], [.34, .52, .34], [Math.PI / 2, 0, 0]), cone([.88, 0, 1.35], [.34, .52, .34], [Math.PI / 2, 0, 0])];
-    if (key === 'power') return [box([0, 0, 0], [2.05, .4, .92]), ...[-.72, -.24, .24, .72].map(x => cylinder([x, 0, 0], [.13, .68, .13], [0, 0, Math.PI / 2]))];
-    if (key === 'control') return [box([0, 0, 0], [1.05, .34, .58]), sphere([-.38, .12, -.24], [.11, .11, .11]), sphere([.38, .12, -.24], [.11, .11, .11])];
-  }
-
-  if (type === 'wearable_suit') {
-    if (key === 'torso') return [box([0, .08, 0], [1.32, 1.5, .64]), box([0, -.7, 0], [.88, .35, .52])];
-    if (key === 'helmet') return [sphere([0, 0, 0], [.5, .58, .47]), box([0, -.03, -.4], [.72, .23, .08])];
-    if (key === 'arms') return [...[-1, 1].flatMap(side => [cylinder([side * .94, .2, 0], [.2, .92, .2], [0, 0, side * -.16]), cylinder([side * 1.08, -.65, 0], [.18, .76, .18], [0, 0, side * .08]), sphere([side * .86, .72, 0], [.28, .28, .28])])];
-    if (key === 'legs') return [...[-1, 1].flatMap(side => [cylinder([side * .38, .12, 0], [.25, 1.05, .25], [0, 0, side * -.04]), cylinder([side * .42, -.9, 0], [.22, .92, .22]), box([side * .42, -1.42, -.12], [.48, .22, .75])])];
-    if (key === 'power_core') return [torus([0, 0, 0], [.34, .09, .34]), sphere([0, 0, 0], [.19, .19, .19])];
-    if (key === 'thrusters') return [-1, 1].flatMap(side => [cylinder([side * .42, 0, 0], [.2, .58, .2]), cone([side * .42, -.48, 0], [.24, .42, .24])]);
-  }
-
-  if (type === 'battery') {
-    if (key === 'casing') return [box([0, 1.22, 0], [3, .14, 1.55]), box([0, -1.22, 0], [3, .14, 1.55]), box([-1.43, 0, 0], [.14, 2.35, 1.55]), box([1.43, 0, 0], [.14, 2.35, 1.55]), box([0, 0, .72], [2.75, 2.2, .1], .28)];
-    if (key === 'cells') return [-.9, -.3, .3, .9].flatMap(x => [-.38, .38].map(z => cylinder([x, 0, z], [.24, 2.05, .24])));
-    if (key === 'separator') return [box([-.6, 0, 0], [.08, 2.05, 1.08], .42), box([0, 0, 0], [.08, 2.05, 1.08], .42), box([.6, 0, 0], [.08, 2.05, 1.08], .42)];
-    if (key === 'terminals') return [cylinder([-.72, 0, 0], [.18, .42, .18]), cylinder([.72, 0, 0], [.18, .42, .18]), box([0, -.12, 0], [1.55, .12, .22])];
-    if (key === 'air_filter') return [box([0, 0, 0], [1.5, .38, .42]), ...[-.54, -.27, 0, .27, .54].map(x => box([x, 0, -.24], [.08, .28, .18]))];
-    if (key === 'control') return [box([0, 0, 0], [.7, .65, .92]), ...[-.2, 0, .2].map(y => box([0, y, -.5], [.48, .06, .08]))];
-  }
-
-  if (type === 'propulsion_system') {
-    if (key === 'frame') return [cylinder([0, 0, 0], [.82, 2.5, .82]), torus([0, .85, 0], [.9, .08, .9], [Math.PI / 2, 0, 0]), torus([0, -.85, 0], [.9, .08, .9], [Math.PI / 2, 0, 0])];
-    if (key === 'power') return [sphere([0, 0, 0], [.62, .62, .62]), torus([0, 0, 0], [.74, .06, .74], [Math.PI / 2, 0, 0])];
-    if (key === 'chamber') return [cylinder([0, 0, 0], [.72, 1.75, .72]), sphere([0, .45, 0], [.5, .5, .5])];
-    if (key === 'field') return [-.45, 0, .45].map(y => torus([0, y, 0], [.95, .08, .95], [Math.PI / 2, 0, 0]));
-    if (key === 'nozzle') return [cone([0, 0, 0], [.82, 1.65, .82], [0, 0, Math.PI])];
-    if (key === 'control') return [box([0, 0, 0], [.72, .88, .62]), sphere([0, .5, 0], [.12, .12, .12])];
-  }
-
-  return [{geometry: module.geometry, position: [0, 0, 0], scale: module.geometry === 'box' ? [module.scale[0] * 2, module.scale[1] * 2, module.scale[2] * 2] : module.scale}];
+function InterfaceLine({from, to, type, exploded}: {from: EngineeringRenderModule; to: EngineeringRenderModule; type: CanonicalEngineeringModel['interfaces'][number]['type']; exploded: boolean}) {
+  const colors = {energy: '#f4bf4f', control: '#55b9ff', heat: '#ff765f', material_flow: '#9dd66f', signal: '#a58cff', structural: '#35d5d0'};
+  return <Line color={colors[type]} dashed lineWidth={.7} opacity={.42} points={[exploded ? from.explodedPosition : from.position, exploded ? to.explodedPosition : to.position]} transparent />;
 }
 
-function box(position: Vector3Tuple, scale: Vector3Tuple, opacity?: number): PartSpec { return {geometry: 'box', position, scale, opacity}; }
+function StatusBeacon({module}: {module: EngineeringRenderModule}) {
+  const color = {info: '#5eead4', success: '#4ade80', warning: '#fbbf24', critical: '#fb7185'}[module.severity];
+  return <mesh position={[0, module.scale[1] + .28, 0]}><sphereGeometry args={[.07, 12, 8]} /><meshBasicMaterial color={color} /><pointLight color={color} distance={1.8} intensity={3} /></mesh>;
+}
+
+function box(position: Vector3Tuple, scale: Vector3Tuple, opacity?: number, wireframe?: boolean): PartSpec { return {geometry: 'box', position, scale, opacity, wireframe}; }
 function cylinder(position: Vector3Tuple, scale: Vector3Tuple, rotation?: Vector3Tuple): PartSpec { return {geometry: 'cylinder', position, scale, rotation}; }
 function sphere(position: Vector3Tuple, scale: Vector3Tuple): PartSpec { return {geometry: 'sphere', position, scale}; }
 function torus(position: Vector3Tuple, scale: Vector3Tuple, rotation?: Vector3Tuple): PartSpec { return {geometry: 'torus', position, scale, rotation}; }
 function cone(position: Vector3Tuple, scale: Vector3Tuple, rotation?: Vector3Tuple): PartSpec { return {geometry: 'cone', position, scale, rotation}; }
 
-function StatusBeacon({module, y}: {module: EngineeringModule; y: number}) {
-  const color = {info: '#5eead4', success: '#4ade80', warning: '#fbbf24', critical: '#fb7185'}[module.severity];
-  return <mesh position={[0, y, 0]}><sphereGeometry args={[.07, 12, 8]} /><meshBasicMaterial color={color} /><pointLight color={color} distance={1.8} intensity={3} /></mesh>;
-}
-
 function CameraRig({resetSignal}: {resetSignal: number}) {
   const controlsRef = useRef<OrbitControlsImpl>(null);
   const {camera} = useThree();
-
   useEffect(() => {
     camera.position.set(6, 4, 7);
     camera.lookAt(0, 0, 0);
@@ -184,6 +165,5 @@ function CameraRig({resetSignal}: {resetSignal: number}) {
       controlsRef.current.update();
     }
   }, [camera, resetSignal]);
-
   return <OrbitControls ref={controlsRef} enableDamping maxDistance={16} minDistance={4.2} panSpeed={.65} rotateSpeed={.62} />;
 }

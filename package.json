@@ -10,6 +10,7 @@
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "smoke:test": "tsx scripts/smoke-test.ts",
+    "engineering:test": "node --conditions=react-server --import tsx scripts/engineering-fixtures.ts",
     "railway:start": "prisma db push --accept-data-loss && prisma generate && next start -H 0.0.0.0 -p ${PORT:-3000}"
   },
   "dependencies": {
