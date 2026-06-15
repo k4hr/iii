@@ -1,11 +1,12 @@
 'use server';
 
 import {revalidatePath} from 'next/cache';
-import {Prisma} from '@prisma/client';
 import {prisma} from '@/lib/db/prisma';
 import {localizeMockValue} from '@/lib/locale/mock-copy';
 import {discoverSourceCandidates} from '@/lib/sources/source-discovery';
 import {requireCurrentUser} from '@/lib/auth/current-user';
+import {normalizeSourceRelationship, normalizeSourceType} from '@/lib/prisma/normalize-enums';
+import {toPrismaJsonObject} from '@/lib/prisma/safe-json';
 
 export async function discoverSourcesAction(
   locale: string,
@@ -52,11 +53,11 @@ export async function discoverSourcesAction(
       data: {
         hypothesisId,
         ...(condition?.id ? {conditionId: condition.id} : {}),
-        title: candidate.title,
-        url: candidate.url,
-        sourceType: candidate.sourceType,
-        relationshipToHypothesis: candidate.relationshipToHypothesis,
-        summary: candidate.summary,
+        title: candidate.title || 'Source candidate',
+        ...(candidate.url ? {url: candidate.url} : {}),
+        sourceType: normalizeSourceType(candidate.sourceType),
+        relationshipToHypothesis: normalizeSourceRelationship(candidate.relationshipToHypothesis),
+        summary: candidate.summary || '',
       },
     })));
 
@@ -66,13 +67,13 @@ export async function discoverSourcesAction(
         data: {
           sessionId: breakthroughSession.id,
           type: 'SOURCE_ADDED',
-          content: {
+          content: toPrismaJsonObject({
             message: ru ? 'Кандидаты источников добавлены для проверки.' : 'Source candidates were added for verification.',
             ...(condition?.id ? {conditionId: condition.id} : {}),
             discoveredCount: candidates.length,
             addedCount: newCandidates.length,
             relationships: newCandidates.map(candidate => candidate.relationshipToHypothesis),
-          } as Prisma.InputJsonValue,
+          }),
         },
       });
     }

@@ -8,6 +8,7 @@ import {z} from 'zod';
 import {signIn, signOut} from '@/auth';
 import {prisma} from '@/lib/db/prisma';
 import {isLocale} from '@/i18n/routing';
+import {normalizeLocale} from '@/lib/prisma/normalize-enums';
 
 const loginSchema = z.object({
   email: z.string().trim().email().transform(value => value.toLowerCase()),
@@ -53,7 +54,7 @@ export async function registerAction(locale: string, formData: FormData) {
         email: parsed.data.email,
         ...(parsed.data.name ? {name: parsed.data.name} : {}),
         passwordHash: await hash(parsed.data.password, 12),
-        locale: normalizedLocale === 'ru' ? 'RU' : 'EN',
+        locale: normalizeLocale(normalizedLocale.toUpperCase()),
       },
     });
   } catch (error) {

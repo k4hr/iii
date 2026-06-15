@@ -1,11 +1,13 @@
 'use server';
 
-import {Prisma, Scale} from '@prisma/client';
+import {Scale} from '@prisma/client';
 import {revalidatePath} from 'next/cache';
 import {DesiredEffectLevel, runOrderOfMagnitudeCalculation, runParameterEstimate} from '@/lib/calculations/order-of-magnitude';
 import {prisma} from '@/lib/db/prisma';
 import {localizeMockValue} from '@/lib/locale/mock-copy';
 import {requireCurrentUser} from '@/lib/auth/current-user';
+import {normalizeScale} from '@/lib/prisma/normalize-enums';
+import {toPrismaJsonObject} from '@/lib/prisma/safe-json';
 
 export async function runCalculationAction(
   locale: string,
@@ -45,7 +47,7 @@ export async function runCalculationAction(
     locale,
     hypothesisTitle: hypothesis.originalTitle,
     hypothesisText: hypothesis.originalText,
-    scale: hypothesis.analyses[0]?.scale,
+    scale: normalizeScale(hypothesis.analyses[0]?.scale, Scale.UNKNOWN),
     realityGap: hypothesis.analyses[0]?.realityGap,
     conditionTitle: localizedCondition?.title,
     conditionDescription: localizedCondition?.description,
@@ -62,8 +64,8 @@ export async function runCalculationAction(
         ...(breakthroughSession?.id ? {breakthroughSessionId: breakthroughSession.id} : {}),
         title: calculation.title,
         calculationType: calculation.calculationType,
-        inputJson: calculation.input as Prisma.InputJsonValue,
-        resultJson: calculation.result as Prisma.InputJsonValue,
+        inputJson: toPrismaJsonObject(calculation.input),
+        resultJson: toPrismaJsonObject(calculation.result),
         explanation: calculation.explanation,
       },
     });
@@ -74,14 +76,14 @@ export async function runCalculationAction(
         data: {
           sessionId: breakthroughSession.id,
           type: 'CALCULATION_RUN',
-          content: {
+          content: toPrismaJsonObject({
             message: ru ? 'Грубый расчёт завершён.' : 'Rough calculation completed.',
             calculationRunId: created.id,
             title: created.title,
             calculationType: created.calculationType,
             gapOrders: calculation.result.gapOrders,
             gapLevel: calculation.result.gapLevel,
-          } as Prisma.InputJsonValue,
+          }),
         },
       });
     }
@@ -124,7 +126,7 @@ export async function runParameterCalculationAction(
   const localizedCondition = condition ? localizeMockValue(condition, locale) : null;
   const objectScaleValue = String(parameters.get('objectScale') || 'UNKNOWN');
   const desiredEffectValue = String(parameters.get('desiredEffect') || 'MEDIUM');
-  const objectScale = Object.values(Scale).includes(objectScaleValue as Scale) ? objectScaleValue as Scale : Scale.UNKNOWN;
+  const objectScale = normalizeScale(objectScaleValue, Scale.UNKNOWN);
   const desiredEffect = isDesiredEffect(desiredEffectValue) ? desiredEffectValue : 'MEDIUM';
   const estimate = runParameterEstimate(locale, {
     objectScale,
@@ -141,7 +143,7 @@ export async function runParameterCalculationAction(
     locale,
     hypothesisTitle: hypothesis.originalTitle,
     hypothesisText: hypothesis.originalText,
-    scale: hypothesis.analyses[0]?.scale,
+    scale: normalizeScale(hypothesis.analyses[0]?.scale, Scale.UNKNOWN),
     realityGap: hypothesis.analyses[0]?.realityGap,
     conditionTitle: localizedCondition?.title,
     conditionDescription: localizedCondition?.description,
@@ -158,8 +160,8 @@ export async function runParameterCalculationAction(
         ...(breakthroughSession?.id ? {breakthroughSessionId: breakthroughSession.id} : {}),
         title: estimate.title,
         calculationType: estimate.calculationType,
-        inputJson: estimate.input as Prisma.InputJsonValue,
-        resultJson: estimate.result as Prisma.InputJsonValue,
+        inputJson: toPrismaJsonObject(estimate.input),
+        resultJson: toPrismaJsonObject(estimate.result),
         explanation: estimate.explanation,
       },
     });
@@ -170,7 +172,7 @@ export async function runParameterCalculationAction(
         data: {
           sessionId: breakthroughSession.id,
           type: 'PARAMETER_CHANGE',
-          content: {
+          content: toPrismaJsonObject({
             message: ru ? 'Параметры модели пересчитаны.' : 'Model parameters recalculated.',
             calculationRunId: created.id,
             hypothesisId,
@@ -182,7 +184,7 @@ export async function runParameterCalculationAction(
             mainRemainingBlocker: estimate.result.mainRemainingBlocker,
             suggestedNextExperiment: estimate.result.suggestedNextExperiment,
             impact: estimate.result.impact,
-          } as Prisma.InputJsonValue,
+          }),
         },
       });
     }
