@@ -25,6 +25,7 @@ type CalculationCardLabels = {
   feasible: string;
   notFeasible: string;
   mainBlocker: string;
+  suggestedNextAction: string;
   researchProgress: string;
   functionalityProgress: string;
   testabilityProgress: string;
@@ -62,6 +63,10 @@ export function CalculationCard({calculation, locale, labels, subject}: Calculat
   const energyGap = asRecord(result.energyGap);
   const scaleGap = asRecord(result.scaleGap);
   const measurement = asRecord(result.measurementFeasibility);
+  const energyUnit = getCalculationUnitLabel('J', locale);
+  const massUnit = getCalculationUnitLabel('kg', locale);
+  const sizeUnit = getCalculationUnitLabel('m', locale);
+  const timeUnit = getCalculationUnitLabel('s', locale);
   const explanation = gapLevel && !isParameterEstimate
     ? createCalculationExplanation({requiredValue, availableValue, unit: asString(result.unit) || asString(input.unit), ratio, gapOrders, gapLevel}, locale)
     : calculation.explanation;
@@ -90,11 +95,12 @@ export function CalculationCard({calculation, locale, labels, subject}: Calculat
         <>
           <div className="mt-5 grid gap-3 border-t border-cyan-100/[0.07] pt-5 sm:grid-cols-2 lg:grid-cols-4">
             <Metric label={labels.playground.objectScale} value={getEnumLabel(asString(parameters.objectScale), locale)} />
-            <Metric label={labels.playground.objectMassKg} value={`${formatNumber(asNumber(parameters.objectMassKg) ?? 0)} kg`} />
-            <Metric label={labels.playground.objectSizeM} value={`${formatNumber(asNumber(parameters.objectSizeM) ?? 0)} m`} />
-            <Metric label={labels.playground.availableEnergyJ} value={`${formatNumber(asNumber(parameters.availableEnergyJ) ?? 0)} J`} />
+            <Metric label={labels.playground.objectMassKg} value={`${formatNumber(asNumber(parameters.objectMassKg) ?? 0)} ${massUnit}`} />
+            <Metric label={labels.playground.objectSizeM} value={`${formatNumber(asNumber(parameters.objectSizeM) ?? 0)} ${sizeUnit}`} />
+            <Metric label={labels.playground.availableEnergyJ} value={`${formatNumber(asNumber(parameters.availableEnergyJ) ?? 0)} ${energyUnit}`} />
+            <Metric label={labels.playground.requiredEnergyJ} value={`${formatNumber(asNumber(parameters.requiredEnergyJ) ?? requiredValue)} ${energyUnit}`} />
             <Metric label={labels.playground.desiredEffect} value={getEffectLabel(asString(parameters.desiredEffect), labels.playground)} />
-            <Metric label={labels.playground.observationTimeS} value={`${formatNumber(asNumber(parameters.observationTimeS) ?? 0)} s`} />
+            <Metric label={labels.playground.observationTimeS} value={`${formatNumber(asNumber(parameters.observationTimeS) ?? 0)} ${timeUnit}`} />
             <Metric label={labels.playground.measurementSensitivity} value={formatNumber(asNumber(parameters.measurementSensitivity) ?? 0)} />
             <Metric label={labels.playground.fieldIntensity} value={formatNumber(asNumber(parameters.fieldIntensity) ?? 0)} />
           </div>
@@ -114,6 +120,11 @@ export function CalculationCard({calculation, locale, labels, subject}: Calculat
           <div className="mt-5 rounded-xl border border-amber-300/[0.12] bg-amber-300/[0.025] p-4">
             <div className="mono-label">{labels.mainBlocker}</div>
             <p className="mt-2 text-xs leading-5 text-amber-100/75">{asString(result.mainRemainingBlocker) || '—'}</p>
+          </div>
+
+          <div className="mt-4 rounded-xl border border-cyan-300/[0.12] bg-cyan-300/[0.025] p-4">
+            <div className="mono-label">{labels.suggestedNextAction}</div>
+            <p className="mt-2 text-xs leading-5 text-cyan-100/75">{asString(result.suggestedNextExperiment) || '—'}</p>
           </div>
 
           {asString(parameters.notes) && <p className="mt-4 text-xs italic leading-5 text-[#78999b]">{asString(parameters.notes)}</p>}

@@ -28,6 +28,7 @@ export type ParameterEstimateInput = {
   objectMassKg: number;
   objectSizeM: number;
   availableEnergyJ: number;
+  requiredEnergyJ: number;
   desiredEffect: DesiredEffectLevel;
   observationTimeS: number;
   measurementSensitivity: number;
@@ -66,6 +67,7 @@ export type ParameterEstimateResult = {
       testabilityProgress: number;
     };
     mainRemainingBlocker: string;
+    suggestedNextExperiment: string;
   };
   explanation: string;
 };
@@ -188,6 +190,10 @@ export function getCalculationGapLabel(level: CalculationGapLevel, locale: strin
 
 export function getCalculationUnitLabel(unit: string, locale: string): string {
   if (locale.toLowerCase() !== 'ru') return unit;
+  if (unit === 'J') return 'Дж';
+  if (unit === 'kg') return 'кг';
+  if (unit === 'm') return 'м';
+  if (unit === 's') return 'с';
   if (unit === 'relative') return 'отн. ед.';
   if (unit === 'scale ratio') return 'коэффициент масштаба';
   return unit;
@@ -220,9 +226,10 @@ export function runParameterEstimate(
   const effectFactor = desiredEffectFactor[normalized.desiredEffect];
   const durationFactor = Math.max(1, Math.sqrt(normalized.observationTimeS));
   const fieldFactor = Math.max(0.01, normalized.fieldIntensity);
-  const requiredEnergyJ = roundSignificant(
+  const modeledRequiredEnergyJ = roundSignificant(
     Math.max(1e-12, normalized.objectMassKg) * 8.98755179e16 * effectFactor * fieldFactor * durationFactor
   );
+  const requiredEnergyJ = roundSignificant(Math.max(normalized.requiredEnergyJ, modeledRequiredEnergyJ));
   const energyRatio = roundSignificant(requiredEnergyJ / Math.max(1e-30, normalized.availableEnergyJ));
   const energyOrders = positiveOrders(energyRatio);
 
@@ -250,6 +257,17 @@ export function runParameterEstimate(
   const blockerLabels = ru
     ? {energy: 'Недостаточный доступный энергетический бюджет', scale: 'Слишком большой физический масштаб объекта', measurement: 'Недостаточная чувствительность измерений'}
     : {energy: 'Insufficient available energy budget', scale: 'Object scale remains too large', measurement: 'Measurement sensitivity is insufficient'};
+  const experimentLabels = ru
+    ? {
+        energy: 'Уменьшить массу или желаемый эффект и провести стендовое сравнение требуемой и доступной энергии.',
+        scale: 'Провести микро- или наноразмерный эксперимент, сохранив тот же измеряемый эффект.',
+        measurement: 'Провести калибровку уровня шума и проверить предел обнаружения на выбранном времени наблюдения.',
+      }
+    : {
+        energy: 'Reduce mass or desired effect and run a benchtop comparison of required and available energy.',
+        scale: 'Run a micro- or nanoscale experiment while preserving the same measurable effect.',
+        measurement: 'Calibrate the noise floor and test the detection limit over the selected observation time.',
+      };
   const subject = context.conditionTitle || context.hypothesisTitle;
   const explanation = ru
     ? `Параметрическая оценка требует около ${formatScientific(requiredEnergyJ)} Дж при доступных ${formatScientific(normalized.availableEnergyJ)} Дж. Энергетический разрыв: ${energyOrders.toFixed(1)} порядка; разрыв масштаба: ${scaleOrders.toFixed(1)} порядка. Ожидаемый относительный сигнал ${formatScientific(predictedSignal)} сравнивается с порогом ${formatScientific(normalized.measurementSensitivity)}. ${measurementFeasible ? 'Выбранный порог позволяет наблюдать оценочный сигнал.' : 'Оценочный сигнал остаётся ниже выбранного порога измерения.'} Расчёт предназначен для сравнения сценариев, а не для подтверждения физической реализуемости.`
@@ -289,6 +307,7 @@ export function runParameterEstimate(
       functionalityImpact: functionalityProgress,
       impact: {researchProgress, functionalityProgress, testabilityProgress},
       mainRemainingBlocker: blockerLabels[mainBlockerKey],
+      suggestedNextExperiment: experimentLabels[mainBlockerKey],
     },
     explanation,
   };
@@ -401,6 +420,7 @@ function normalizeParameters(parameters: ParameterEstimateInput): ParameterEstim
     objectMassKg: positiveFinite(parameters.objectMassKg, 1),
     objectSizeM: positiveFinite(parameters.objectSizeM, 1),
     availableEnergyJ: positiveFinite(parameters.availableEnergyJ, 1e6),
+    requiredEnergyJ: positiveFinite(parameters.requiredEnergyJ, 1e9),
     desiredEffect: parameters.desiredEffect in desiredEffectFactor ? parameters.desiredEffect : 'MEDIUM',
     observationTimeS: positiveFinite(parameters.observationTimeS, 1),
     measurementSensitivity: positiveFinite(parameters.measurementSensitivity, 1e-9),

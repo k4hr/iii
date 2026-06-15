@@ -4,12 +4,14 @@ import {GlowButton} from '@/components/ui/GlowButton';
 import {getEnumLabel} from '@/lib/locale/enum-labels';
 
 export type ParameterPlaygroundLabels = {
+  kicker: string;
   title: string;
   description: string;
   objectScale: string;
   objectMassKg: string;
   objectSizeM: string;
   availableEnergyJ: string;
+  requiredEnergyJ: string;
   desiredEffect: string;
   observationTimeS: string;
   measurementSensitivity: string;
@@ -35,7 +37,7 @@ export function ParameterPlayground({action, locale, labels, defaultScale = 'HUM
   return (
     <GlassPanel glow className="data-grid p-5 sm:p-7">
       <div>
-        <div className="section-kicker">PARAMETER PLAYGROUND V1</div>
+        <div className="section-kicker">{labels.kicker}</div>
         <h3 className="mt-3 text-xl font-semibold text-cyan-50">{labels.title}</h3>
         <p className="mt-3 max-w-4xl text-xs leading-6 text-[#78999b]">{labels.description}</p>
       </div>
@@ -54,6 +56,9 @@ export function ParameterPlayground({action, locale, labels, defaultScale = 'HUM
         </Field>
         <Field label={labels.availableEnergyJ}>
           <input className="lab-input" defaultValue={compactDefaults ? 1000000 : 1000000000} min="1e-30" name="availableEnergyJ" step="any" type="number" required />
+        </Field>
+        <Field label={labels.requiredEnergyJ}>
+          <input className="lab-input" defaultValue={compactDefaults ? 10000 : 1000000000} min="1e-30" name="requiredEnergyJ" step="any" type="number" required />
         </Field>
         <Field label={labels.desiredEffect}>
           <select className="lab-input" defaultValue={compactDefaults ? 'LOW' : 'MEDIUM'} name="desiredEffect">

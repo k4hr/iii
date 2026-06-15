@@ -177,18 +177,30 @@ export async function buildLabLog(input: BuildLabLogInput): Promise<LabLogItem[]
   }
 
   for (const calculation of calculations) {
+    const input = jsonRecord(calculation.inputJson);
     const result = jsonRecord(calculation.resultJson);
     const gapLevel = stringValue(result.gapLevel);
+    const isParameterEstimate = stringValue(input.mode) === 'parameter_playground';
+    const energyGap = jsonRecord(result.energyGap);
+    const scaleGap = jsonRecord(result.scaleGap);
+    const impact = jsonRecord(result.impact);
     items.push({
       id: `calculation-${calculation.id}`,
       timestamp: calculation.createdAt,
-      type: 'CALCULATION_RUN',
-      title: labels.calculationRun,
-      description: calculation.explanation || labels.calculationDescription,
+      type: isParameterEstimate ? 'PARAMETER_RECALCULATED' : 'CALCULATION_RUN',
+      title: isParameterEstimate ? labels.modelParametersRecalculated : labels.calculationRun,
+      description: isParameterEstimate ? labels.parameterCalculationDescription : calculation.explanation || labels.calculationDescription,
       severity: gapLevel === 'EXTREME' ? 'critical' : gapLevel === 'HIGH' ? 'warning' : 'success',
       sourceType: 'calculation',
       href: calculation.breakthroughSessionId ? `/${locale}/breakthroughs/${calculation.breakthroughSessionId}` : `/${locale}/hypotheses/${calculation.hypothesisId}`,
-      metadata: gapLevel ? {[labels.metadata.gap]: getEnumLabel(gapLevel, locale)} : undefined,
+      metadata: isParameterEstimate
+        ? {
+            [labels.metadata.gap]: getEnumLabel(gapLevel, locale),
+            [labels.metadata.energyGap]: numberValue(energyGap.orders),
+            [labels.metadata.scaleGap]: numberValue(scaleGap.orders),
+            [labels.metadata.testabilityImpact]: numberValue(impact.testabilityProgress),
+          }
+        : gapLevel ? {[labels.metadata.gap]: getEnumLabel(gapLevel, locale)} : undefined,
     });
   }
 
@@ -313,7 +325,17 @@ function mapBreakthroughEvent(
   if (type === 'SOURCE_ADDED') return {title: labels.sourceDiscoveryRun, description: labels.sourceCandidateDescription, severity: 'info', sourceType: 'source', metadata: {[labels.metadata.count]: numberValue(content.addedCount)}};
   if (type === 'SUB_HYPOTHESIS_CREATED') return {title: labels.subHypothesisCreated, description: stringValue(content.description) || labels.hypothesisDescription, severity: 'success', sourceType: 'hypothesis'};
   if (type === 'NEW_PATH_FOUND') return {title: labels.workaroundFound, description: stringValue(content.description) || stringValue(content.path), severity: 'success', sourceType: 'breakthrough'};
-  if (type === 'PARAMETER_CHANGE') return {title: labels.parametersChanged, description: stringValue(content.description), severity: 'info', sourceType: 'calculation'};
+  if (type === 'PARAMETER_CHANGE') return {
+    title: labels.modelParametersRecalculated,
+    description: stringValue(content.message) || labels.parameterCalculationDescription,
+    severity: 'info',
+    sourceType: 'calculation',
+    metadata: {
+      [labels.metadata.energyGap]: numberValue(content.energyGap),
+      [labels.metadata.scaleGap]: numberValue(content.scaleGap),
+      [labels.metadata.testabilityImpact]: numberValue(content.testabilityImpact),
+    },
+  };
   if (type === 'STATUS_CHANGED') return {title: labels.statusChanged, description: stringValue(content.description), severity: 'info', sourceType: 'breakthrough', metadata: {[labels.metadata.status]: getEnumLabel(stringValue(content.status), locale)}};
   if (type === 'USER_NOTE') return {title: labels.userNote, description: stringValue(content.note), severity: 'info', sourceType: 'idea', metadata: stringValue(content.note) ? {[labels.metadata.note]: stringValue(content.note)} : undefined};
   if (type === 'AI_REASONING_STEP') return {title: labels.deeperBreakdown, description: stringValue(content.description) || labels.analysisDescription, severity: 'info', sourceType: 'system'};

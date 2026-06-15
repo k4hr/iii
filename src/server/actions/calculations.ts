@@ -127,6 +127,7 @@ export async function runParameterCalculationAction(
     objectMassKg: formNumber(parameters, 'objectMassKg', 1),
     objectSizeM: formNumber(parameters, 'objectSizeM', 1),
     availableEnergyJ: formNumber(parameters, 'availableEnergyJ', 1e6),
+    requiredEnergyJ: formNumber(parameters, 'requiredEnergyJ', 1e9),
     desiredEffect,
     observationTimeS: formNumber(parameters, 'observationTimeS', 60),
     measurementSensitivity: formNumber(parameters, 'measurementSensitivity', 1e-9),
@@ -164,13 +165,18 @@ export async function runParameterCalculationAction(
       await tx.breakthroughEvent.create({
         data: {
           sessionId: breakthroughSession.id,
-          type: 'CALCULATION_RUN',
+          type: 'PARAMETER_CHANGE',
           content: {
-            message: ru ? 'Параметрический сценарий рассчитан.' : 'Parameter scenario calculated.',
+            message: ru ? 'Параметры модели пересчитаны.' : 'Model parameters recalculated.',
             calculationRunId: created.id,
+            hypothesisId,
             gapLevel: estimate.result.gapLevel,
             gapOrders: estimate.result.gapOrders,
+            energyGap: estimate.result.energyGap.orders,
+            scaleGap: estimate.result.scaleGap.orders,
+            testabilityImpact: estimate.result.impact.testabilityProgress,
             mainRemainingBlocker: estimate.result.mainRemainingBlocker,
+            suggestedNextExperiment: estimate.result.suggestedNextExperiment,
             impact: estimate.result.impact,
           } as Prisma.InputJsonValue,
         },
