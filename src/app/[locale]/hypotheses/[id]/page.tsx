@@ -17,6 +17,7 @@ import {getEnumLabel, getExperimentDifficultyLabel, getExperimentTypeLabel, getS
 import {getLocalizedSourceSummary} from '@/lib/sources/source-discovery';
 import {isParameterCalculationInput} from '@/lib/calculations/order-of-magnitude';
 import {buildLabLog} from '@/lib/lab-log/build-lab-log';
+import {buildVisualModel} from '@/lib/visual-lab/build-visual-model';
 import {runCalculationAction, runParameterCalculationAction} from '@/server/actions/calculations';
 import {discoverSourcesAction} from '@/server/actions/sources';
 
@@ -109,10 +110,52 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
       href: `/${locale}/hypotheses/${hypothesis.id}#calculations`,
     };
   });
+  const visualLabConditions = conditions.map(condition => {
+    const session = hypothesis.breakthroughSessions.find(item => item.conditionId === condition.id);
+    return {
+      id: condition.id,
+      parentId: condition.parentId,
+      title: condition.title,
+      status: condition.status,
+      importance: condition.importance,
+      confidence: condition.confidence,
+      completionScore: condition.completionScore,
+      href: session ? `/${locale}/breakthroughs/${session.id}` : `/${locale}/hypotheses/${hypothesis.id}#condition-${condition.id}`,
+    };
+  });
+  const visualLabSources = sources.map(source => ({
+    id: source.id,
+    conditionId: source.conditionId,
+    title: source.title,
+    relationship: source.relationshipToHypothesis,
+    href: `/${locale}/hypotheses/${hypothesis.id}#sources`,
+  }));
+  const visualLabBreakthroughs = hypothesis.breakthroughSessions.map(session => ({
+    id: session.id,
+    conditionId: session.conditionId,
+    title: localizeMockValue(session, locale).title,
+    progressScore: session.progressScore,
+    href: `/${locale}/breakthroughs/${session.id}`,
+  }));
+  const visualLabHypothesis = {
+    id: hypothesis.id,
+    title: hypothesis.originalTitle,
+    progress: analysis.researchProgress,
+    confidence: analysis.confidence,
+    href: `/${locale}/hypotheses/${hypothesis.id}`,
+  };
+  const hiddenCount = Math.max(0, Number(buildVisualModel({
+    locale,
+    hypothesis: visualLabHypothesis,
+    conditions: visualLabConditions,
+    calculations: visualLabCalculations,
+    sources: visualLabSources,
+    breakthroughSessions: visualLabBreakthroughs,
+  }).omittedCount ?? 0));
   const visualLabLabels = {
     kicker: visualLabT('kicker'), title: visualLabT('title'), description: visualLabT('description'),
     confidence: visualLabT('confidence'), gapOrders: visualLabT('gapOrders'), open: visualLabT('open'),
-    more: visualLabT('more'), selected: visualLabT('selected'),
+    more: visualLabT('more', {count: hiddenCount}), selected: visualLabT('selected'),
     nodeTypes: {
       hypothesis: visualLabT('nodeTypes.hypothesis'), condition: visualLabT('nodeTypes.condition'), blocker: visualLabT('nodeTypes.blocker'),
       calculation: visualLabT('nodeTypes.calculation'), source: visualLabT('nodeTypes.source'), breakthrough: visualLabT('nodeTypes.breakthrough'),
@@ -244,31 +287,13 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
 
       <section id="visual-lab">
         <AnimatedVisualLab
-          breakthroughSessions={hypothesis.breakthroughSessions.map(session => ({
-            id: session.id,
-            conditionId: session.conditionId,
-            title: localizeMockValue(session, locale).title,
-            progressScore: session.progressScore,
-            href: `/${locale}/breakthroughs/${session.id}`,
-          }))}
+          breakthroughSessions={visualLabBreakthroughs}
           calculations={visualLabCalculations}
-          conditions={conditions.map(condition => {
-            const session = hypothesis.breakthroughSessions.find(item => item.conditionId === condition.id);
-            return {
-              id: condition.id,
-              parentId: condition.parentId,
-              title: condition.title,
-              status: condition.status,
-              importance: condition.importance,
-              confidence: condition.confidence,
-              completionScore: condition.completionScore,
-              href: session ? `/${locale}/breakthroughs/${session.id}` : `/${locale}/hypotheses/${hypothesis.id}#condition-${condition.id}`,
-            };
-          })}
-          hypothesis={{id: hypothesis.id, title: hypothesis.originalTitle, progress: analysis.researchProgress, confidence: analysis.confidence, href: `/${locale}/hypotheses/${hypothesis.id}`}}
+          conditions={visualLabConditions}
+          hypothesis={visualLabHypothesis}
           labels={visualLabLabels}
           locale={locale}
-          sources={sources.map(source => ({id: source.id, conditionId: source.conditionId, title: source.title, relationship: source.relationshipToHypothesis, href: `/${locale}/hypotheses/${hypothesis.id}#sources`}))}
+          sources={visualLabSources}
         />
       </section>
 
