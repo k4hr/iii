@@ -37,7 +37,7 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
   const visualLabT = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'visualLab'});
   const engineeringT = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'engineeringLab'});
   const user = await getCurrentUser();
-  if (!user) redirect(`/${locale}/account`);
+  if (!user) redirect(`/${locale}/login`);
   const hypothesis = await prisma.hypothesis.findFirst({
     where: {id, ownerId: user.id},
     include: {

@@ -1,9 +1,14 @@
 import Link from 'next/link';
-import {useTranslations} from 'next-intl';
+import {getTranslations} from 'next-intl/server';
 import {locales} from '@/i18n/routing';
+import {auth} from '@/auth';
+import {logoutAction} from '@/server/actions/auth';
 
-export function Header({locale}: {locale: string}) {
-  const t = useTranslations('common');
+export async function Header({locale}: {locale: string}) {
+  const t = await getTranslations({locale, namespace: 'common'});
+  const authT = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'auth'});
+  const session = await auth();
+  const authenticated = Boolean(session?.user?.id);
   const ru = locale === 'ru';
 
   return (
@@ -21,11 +26,16 @@ export function Header({locale}: {locale: string}) {
         </Link>
 
         <nav className="hidden items-center gap-1 rounded-xl border border-white/[0.05] bg-black/20 p-1 text-xs text-[#86a5a7] md:flex">
-          <NavLink href={`/${locale}/dashboard`}>{t('dashboard')}</NavLink>
-          <NavLink href={`/${locale}/projects`}>{t('projects')}</NavLink>
-          <NavLink href={`/${locale}/hypotheses`}>{t('hypotheses')}</NavLink>
-          <NavLink href={`/${locale}/account`}>{locale === 'ru' || locale === 'en' ? t('account') : 'Account'}</NavLink>
-          <NavLink href={`/${locale}/settings`}>{t('settings')}</NavLink>
+          {authenticated ? <>
+            <NavLink href={`/${locale}/dashboard`}>{t('dashboard')}</NavLink>
+            <NavLink href={`/${locale}/projects`}>{t('projects')}</NavLink>
+            <NavLink href={`/${locale}/hypotheses`}>{t('hypotheses')}</NavLink>
+            <NavLink href={`/${locale}/account`}>{locale === 'ru' || locale === 'en' ? t('account') : 'Account'}</NavLink>
+            <NavLink href={`/${locale}/settings`}>{t('settings')}</NavLink>
+          </> : <>
+            <NavLink href={`/${locale}/login`}>{authT('login')}</NavLink>
+            <NavLink href={`/${locale}/register`}>{authT('register')}</NavLink>
+          </>}
         </nav>
 
         <div className="flex items-center gap-2">
@@ -44,6 +54,7 @@ export function Header({locale}: {locale: string}) {
               </Link>
             ))}
           </div>
+          {authenticated && <form action={logoutAction.bind(null, locale)}><button className="rounded-lg border border-cyan-100/[0.08] bg-black/25 px-2.5 py-2 font-mono text-[9px] tracking-[.08em] text-cyan-100/55 uppercase hover:text-cyan-50" type="submit">{authT('logout')}</button></form>}
         </div>
       </div>
     </header>

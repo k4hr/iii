@@ -27,7 +27,7 @@ export default async function BreakthroughPage({params}: {params: Promise<{local
   const sourceT = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'sources'});
   const labT = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'labLog'});
   const user = await getCurrentUser();
-  if (!user) redirect(`/${locale}/account`);
+  if (!user) redirect(`/${locale}/login`);
   const session = await prisma.breakthroughSession.findFirst({
     where: {id, ownerId: user.id},
     include: {condition: {include: {sourceReferences: {orderBy: {createdAt: 'desc'}}}}, hypothesis: {include: {analyses: {orderBy: {createdAt: 'desc'}, take: 1}}}, ideas: {orderBy: {createdAt: 'desc'}, include: {checks: true}}, calculationRuns: {orderBy: {createdAt: 'desc'}}},

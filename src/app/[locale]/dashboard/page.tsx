@@ -17,7 +17,7 @@ export default async function Dashboard({params}: {params: Promise<{locale: stri
   const c = await getTranslations('common');
   const labT = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'labLog'});
   const user = await getCurrentUser();
-  if (!user) redirect(`/${locale}/account`);
+  if (!user) redirect(`/${locale}/login`);
   const [projects, hypotheses, sessions, calculations, labLogItems] = await Promise.all([
     prisma.project.findMany({where: {ownerId: user.id}, take: 3, orderBy: {createdAt: 'desc'}}),
     prisma.hypothesis.findMany({where: {ownerId: user.id}, take: 4, orderBy: {createdAt: 'desc'}, include: {analyses: {take: 1, orderBy: {createdAt: 'desc'}}}}),

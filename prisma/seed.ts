@@ -122,7 +122,7 @@ async function main() {
   await prisma.physicalLaw.deleteMany();
   await prisma.unsolvedProblem.deleteMany();
 
-  const user = await prisma.user.upsert({where:{email:'demo@theoryforge.local'}, update:{}, create:{email:'demo@theoryforge.local', name:'Demo Researcher', preferredLocale:Locale.EN}});
+  const user = await prisma.user.upsert({where:{email:'demo@theoryforge.local'}, update:{}, create:{email:'demo@theoryforge.local', name:'Demo Researcher', locale:Locale.EN}});
   const time = await prisma.project.create({data:{ownerId:user.id,title:'Time Manipulation',description:'Research direction for time dilation, spacetime engineering and causality-safe tests.'}});
   const energy = await prisma.project.create({data:{ownerId:user.id,title:'Compact Energy Systems',description:'Wearable high-density power, thermal constraints and materials.'}});
   const battery = await prisma.project.create({data:{ownerId:user.id,title:'Advanced Batteries',description:'Lithium-air, filtration and next-generation storage.'}});

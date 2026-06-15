@@ -2,23 +2,16 @@ import {getTranslations} from 'next-intl/server';
 import {getCurrentUser} from '@/lib/auth/current-user';
 import {prisma} from '@/lib/db/prisma';
 import {GlassPanel} from '@/components/ui/GlassPanel';
+import {GlowButton} from '@/components/ui/GlowButton';
+import {logoutAction} from '@/server/actions/auth';
+import {redirect} from 'next/navigation';
 
 export default async function AccountPage({params}: {params: Promise<{locale: string}>}) {
   const {locale} = await params;
   const t = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'account'});
+  const authT = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'auth'});
   const user = await getCurrentUser();
-
-  if (!user) {
-    return (
-      <div className="mx-auto max-w-3xl py-8">
-        <GlassPanel glow className="p-7 sm:p-9">
-          <div className="section-kicker">{t('privateWorkspace')}</div>
-          <h1 className="section-heading mt-4">{t('title')}</h1>
-          <p className="mt-4 text-sm leading-7 text-[#89a6a8]">{t('authRequired')}</p>
-        </GlassPanel>
-      </div>
-    );
-  }
+  if (!user) redirect(`/${locale}/login`);
 
   const [projectCount, hypothesisCount, breakthroughCount] = await Promise.all([
     prisma.project.count({where: {ownerId: user.id}}),
@@ -40,9 +33,10 @@ export default async function AccountPage({params}: {params: Promise<{locale: st
           <dl className="mt-6 grid gap-5 sm:grid-cols-2">
             <AccountField label={t('name')} value={user.name || t('notSet')} />
             <AccountField label={t('email')} value={user.email || t('notSet')} />
-            <AccountField label={t('selectedLocale')} value={localeName(user.preferredLocale, locale)} />
+            <AccountField label={t('selectedLocale')} value={localeName(user.locale, locale)} />
             <AccountField label={t('workspaceId')} value={user.id} />
           </dl>
+          <form action={logoutAction.bind(null, locale)} className="mt-7 border-t border-cyan-100/[0.07] pt-5"><GlowButton variant="secondary">{authT('logout')}</GlowButton></form>
         </GlassPanel>
 
         <GlassPanel className="data-grid p-6 sm:p-7">
