@@ -1,9 +1,11 @@
 import {getTranslations} from 'next-intl/server';
 import {prisma} from '@/lib/db/prisma';
 import {addIdeaAction, addUserNoteAction} from '@/server/actions/breakthroughs';
-import {runCalculationAction} from '@/server/actions/calculations';
+import {runCalculationAction, runParameterCalculationAction} from '@/server/actions/calculations';
 import {discoverSourcesAction} from '@/server/actions/sources';
 import {CalculationCard} from '@/components/calculations/CalculationCard';
+import {ParameterPlayground} from '@/components/calculations/ParameterPlayground';
+import {LabLogTimeline} from '@/components/lab-log/LabLogTimeline';
 import {SourceCandidateCard} from '@/components/sources/SourceCandidateCard';
 import {GlassPanel} from '@/components/ui/GlassPanel';
 import {GlowButton} from '@/components/ui/GlowButton';
@@ -11,20 +13,24 @@ import {ProgressRing} from '@/components/ui/ProgressRing';
 import {StatusBadge} from '@/components/ui/StatusBadge';
 import {evaluateBreakthroughIdea} from '@/lib/ai/evaluate-breakthrough-idea';
 import {localizeMockValue} from '@/lib/locale/mock-copy';
-import {getBreakthroughStatusLabel, getConditionImportanceLabel, getIdeaStatusLabel, humanizeEnum} from '@/lib/locale/enum-labels';
+import {getBreakthroughStatusLabel, getConditionImportanceLabel, getEnumLabel, getIdeaStatusLabel, humanizeEnum} from '@/lib/locale/enum-labels';
 import {getLocalizedSourceSummary} from '@/lib/sources/source-discovery';
+import {isParameterCalculationInput} from '@/lib/calculations/order-of-magnitude';
+import {buildLabLog} from '@/lib/lab-log/build-lab-log';
 
 export default async function BreakthroughPage({params}: {params: Promise<{locale: string; id: string}>}) {
   const {locale, id} = await params;
   const t = await getTranslations('breakthrough');
   const calc = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'calculations'});
   const sourceT = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'sources'});
+  const labT = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'labLog'});
   const session = await prisma.breakthroughSession.findUnique({
     where: {id},
-    include: {condition: {include: {sourceReferences: {orderBy: {createdAt: 'desc'}}}}, hypothesis: true, ideas: {orderBy: {createdAt: 'desc'}, include: {checks: true}}, events: {orderBy: {createdAt: 'desc'}}, calculationRuns: {orderBy: {createdAt: 'desc'}}},
+    include: {condition: {include: {sourceReferences: {orderBy: {createdAt: 'desc'}}}}, hypothesis: {include: {analyses: {orderBy: {createdAt: 'desc'}, take: 1}}}, ideas: {orderBy: {createdAt: 'desc'}, include: {checks: true}}, calculationRuns: {orderBy: {createdAt: 'desc'}}},
   });
 
   if (!session) return <div>Not found</div>;
+  const labLogItems = await buildLabLog({locale: locale === 'ru' ? 'ru' : 'en', breakthroughSessionId: id});
   const ru = locale === 'ru';
   const condition = localizeMockValue(session.condition, locale);
   const ideas = session.ideas.map(idea => ({...idea, ...evaluateBreakthroughIdea(idea.rawText, locale), checks: localizeMockValue(idea.checks, locale)}));
@@ -34,6 +40,21 @@ export default async function BreakthroughPage({params}: {params: Promise<{local
   const knownState = ru ? {известно: condition.knownWhat} : {known: condition.knownWhat};
   const missingPieces = ru ? {неизвестно: condition.unknownWhat, необходимые_данные: condition.requiredEvidence} : {unknown: condition.unknownWhat, requiredEvidence: condition.requiredEvidence};
   const sources = session.condition.sourceReferences.map(source => ({...source, summary: getLocalizedSourceSummary(source, locale)}));
+  const labLogLabels = {
+    title: labT('title'),
+    workspaceTitle: labT('workspaceTitle'),
+    events: labT('events'),
+    details: labT('details'),
+    noEvents: labT('noEvents'),
+    sourceTypes: {
+      hypothesis: labT('sourceTypes.hypothesis'), condition: labT('sourceTypes.condition'), breakthrough: labT('sourceTypes.breakthrough'),
+      idea: labT('sourceTypes.idea'), calculation: labT('sourceTypes.calculation'), source: labT('sourceTypes.source'),
+      experiment: labT('sourceTypes.experiment'), simulation: labT('sourceTypes.simulation'), system: labT('sourceTypes.system'),
+    },
+    severity: {
+      info: labT('severity.info'), success: labT('severity.success'), warning: labT('severity.warning'), critical: labT('severity.critical'),
+    },
+  };
   const calculationLabels = {
     inputs: calc('inputs'),
     result: calc('result'),
@@ -42,7 +63,37 @@ export default async function BreakthroughPage({params}: {params: Promise<{local
     ratio: calc('ratio'),
     orders: calc('orders'),
     preliminary: calc('preliminary'),
+    energyGap: calc('energyGap'),
+    scaleGap: calc('scaleGap'),
+    measurementFeasibility: calc('measurementFeasibility'),
+    feasible: calc('feasible'),
+    notFeasible: calc('notFeasible'),
+    mainBlocker: calc('mainBlocker'),
+    researchProgress: calc('researchProgress'),
+    functionalityProgress: calc('functionalityProgress'),
+    testabilityProgress: calc('testabilityProgress'),
+    playground: {
+      title: calc('playground.title'),
+      description: calc('playground.description'),
+      objectScale: calc('playground.objectScale'),
+      objectMassKg: calc('playground.objectMassKg'),
+      objectSizeM: calc('playground.objectSizeM'),
+      availableEnergyJ: calc('playground.availableEnergyJ'),
+      desiredEffect: calc('playground.desiredEffect'),
+      observationTimeS: calc('playground.observationTimeS'),
+      measurementSensitivity: calc('playground.measurementSensitivity'),
+      sensitivityHelp: calc('playground.sensitivityHelp'),
+      fieldIntensity: calc('playground.fieldIntensity'),
+      notes: calc('playground.notes'),
+      notesPlaceholder: calc('playground.notesPlaceholder'),
+      run: calc('playground.run'),
+      effects: {low: calc('playground.effects.low'), medium: calc('playground.effects.medium'), high: calc('playground.effects.high'), extreme: calc('playground.effects.extreme')},
+    },
   };
+  const latestParameterRun = session.calculationRuns.find(calculation => isParameterCalculationInput(calculation.inputJson));
+  const calculationHistory = latestParameterRun
+    ? session.calculationRuns.filter(calculation => calculation.id !== latestParameterRun.id)
+    : session.calculationRuns;
 
   return (
     <div className="space-y-10 py-3">
@@ -106,12 +157,30 @@ export default async function BreakthroughPage({params}: {params: Promise<{local
             </form>
           </div>
         </GlassPanel>
-        {session.calculationRuns.length ? (
+        <div className="mt-4">
+          <ParameterPlayground
+            action={runParameterCalculationAction.bind(null, locale, session.hypothesisId, session.conditionId, session.id)}
+            compactDefaults
+            defaultScale={session.hypothesis.analyses[0]?.scale}
+            labels={calculationLabels.playground}
+            locale={locale}
+          />
+        </div>
+        {latestParameterRun && (
+          <div className="mt-6">
+            <CockpitHeader code="LATEST" title={calc('latestResult')} status={getCalculationGapLabelFromRun(latestParameterRun.resultJson, locale)} />
+            <div className="mt-4"><CalculationCard calculation={latestParameterRun} labels={calculationLabels} locale={locale} subject={condition.title} /></div>
+          </div>
+        )}
+        {calculationHistory.length ? (
+          <div className="mt-6">
+            <CockpitHeader code="HISTORY" title={calc('runHistory')} status={`${calculationHistory.length} ${calc('history')}`} />
           <div className="mt-4 grid gap-4 xl:grid-cols-2">
-            {session.calculationRuns.map(calculation => <CalculationCard calculation={calculation} labels={calculationLabels} locale={locale} subject={condition.title} key={calculation.id} />)}
+            {calculationHistory.map(calculation => <CalculationCard calculation={calculation} labels={calculationLabels} locale={locale} subject={condition.title} key={calculation.id} />)}
+          </div>
           </div>
         ) : (
-          <p className="mt-4 rounded-xl border border-dashed border-cyan-100/[0.1] px-5 py-4 text-xs text-[#78999b]">{calc('empty')}</p>
+          !latestParameterRun && <p className="mt-4 rounded-xl border border-dashed border-cyan-100/[0.1] px-5 py-4 text-xs text-[#78999b]">{calc('empty')}</p>
         )}
       </section>
 
@@ -161,21 +230,14 @@ export default async function BreakthroughPage({params}: {params: Promise<{local
       </section>
 
       <GlassPanel className="p-5 sm:p-6">
-        <CockpitHeader code="LOG-03" title={t('labLog')} status={`${session.events.length} ${ru ? 'событий' : 'events'}`} />
+        <CockpitHeader code="NOTE-03" title={t('addNote')} status={labT('workspaceTitle')} />
         <form action={addUserNoteAction.bind(null, locale, session.id)} className="mt-5 flex flex-col gap-3 sm:flex-row">
           <input className="lab-input" name="note" placeholder={t('notePlaceholder')} />
           <GlowButton variant="secondary">{t('addNote')}</GlowButton>
         </form>
-        <div className="relative mt-6 space-y-3 border-l border-cyan-200/15 pl-6">
-          {session.events.map((event, index) => (
-            <div className="relative rounded-xl border border-cyan-100/[0.07] bg-black/30 p-4" key={event.id}>
-              <span className="absolute -left-[1.72rem] top-5 h-2.5 w-2.5 rounded-full border-2 border-[#071315] bg-cyan-300 shadow-[0_0_10px_#43f1df]" />
-              <div className="flex flex-wrap items-center justify-between gap-3"><StatusBadge value={event.type} locale={locale} /><span className="font-mono text-[9px] text-cyan-100/25">{ru ? 'СОБЫТИЕ' : 'EVENT'} {String(session.events.length - index).padStart(3, '0')}</span></div>
-              <div className="terminal-text mt-3 text-xs leading-5 text-[#78999b]">{formatDiagnostic(localizeMockValue(event.content, locale))}</div>
-            </div>
-          ))}
-        </div>
       </GlassPanel>
+
+      <LabLogTimeline items={labLogItems} locale={locale} labels={labLogLabels} />
     </div>
   );
 }
@@ -204,4 +266,10 @@ function formatDiagnostic(data: unknown): string {
   if (typeof data === 'string' || typeof data === 'number' || typeof data === 'boolean') return String(data);
   if (Array.isArray(data)) return data.map(formatDiagnostic).join(' · ');
   return Object.entries(data as Record<string, unknown>).map(([key, value]) => `${humanizeEnum(key)}: ${formatDiagnostic(value)}`).join(' · ');
+}
+
+function getCalculationGapLabelFromRun(resultJson: unknown, locale: string): string {
+  if (!resultJson || typeof resultJson !== 'object' || Array.isArray(resultJson)) return '—';
+  const gapLevel = (resultJson as {gapLevel?: unknown}).gapLevel;
+  return typeof gapLevel === 'string' ? getEnumLabel(gapLevel, locale) : '—';
 }

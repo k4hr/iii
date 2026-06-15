@@ -1,4 +1,5 @@
 import type {CalculationType, Prisma} from '@prisma/client';
+import type {ParameterPlaygroundLabels} from '@/components/calculations/ParameterPlayground';
 import {GlassPanel} from '@/components/ui/GlassPanel';
 import {StatusBadge} from '@/components/ui/StatusBadge';
 import {
@@ -8,6 +9,7 @@ import {
   getCalculationTypeLabel,
   getCalculationUnitLabel,
 } from '@/lib/calculations/order-of-magnitude';
+import {getEnumLabel} from '@/lib/locale/enum-labels';
 
 type CalculationCardLabels = {
   inputs: string;
@@ -17,6 +19,16 @@ type CalculationCardLabels = {
   ratio: string;
   orders: string;
   preliminary: string;
+  energyGap: string;
+  scaleGap: string;
+  measurementFeasibility: string;
+  feasible: string;
+  notFeasible: string;
+  mainBlocker: string;
+  researchProgress: string;
+  functionalityProgress: string;
+  testabilityProgress: string;
+  playground: ParameterPlaygroundLabels;
 };
 
 type CalculationCardProps = {
@@ -44,7 +56,13 @@ export function CalculationCard({calculation, locale, labels, subject}: Calculat
   const ratio = asNumber(result.ratio) ?? 0;
   const gapOrders = asNumber(result.gapOrders) ?? 0;
   const displaySubject = subject || asString(input.subject);
-  const explanation = gapLevel
+  const isParameterEstimate = asString(input.mode) === 'parameter_playground';
+  const parameters = asRecord(input.parameters);
+  const impact = asRecord(result.impact);
+  const energyGap = asRecord(result.energyGap);
+  const scaleGap = asRecord(result.scaleGap);
+  const measurement = asRecord(result.measurementFeasibility);
+  const explanation = gapLevel && !isParameterEstimate
     ? createCalculationExplanation({requiredValue, availableValue, unit: asString(result.unit) || asString(input.unit), ratio, gapOrders, gapLevel}, locale)
     : calculation.explanation;
 
@@ -68,6 +86,40 @@ export function CalculationCard({calculation, locale, labels, subject}: Calculat
         <Metric label={`${labels.result}: ${labels.orders}`} value={gapOrders.toFixed(1)} />
       </div>
 
+      {isParameterEstimate && (
+        <>
+          <div className="mt-5 grid gap-3 border-t border-cyan-100/[0.07] pt-5 sm:grid-cols-2 lg:grid-cols-4">
+            <Metric label={labels.playground.objectScale} value={getEnumLabel(asString(parameters.objectScale), locale)} />
+            <Metric label={labels.playground.objectMassKg} value={`${formatNumber(asNumber(parameters.objectMassKg) ?? 0)} kg`} />
+            <Metric label={labels.playground.objectSizeM} value={`${formatNumber(asNumber(parameters.objectSizeM) ?? 0)} m`} />
+            <Metric label={labels.playground.availableEnergyJ} value={`${formatNumber(asNumber(parameters.availableEnergyJ) ?? 0)} J`} />
+            <Metric label={labels.playground.desiredEffect} value={getEffectLabel(asString(parameters.desiredEffect), labels.playground)} />
+            <Metric label={labels.playground.observationTimeS} value={`${formatNumber(asNumber(parameters.observationTimeS) ?? 0)} s`} />
+            <Metric label={labels.playground.measurementSensitivity} value={formatNumber(asNumber(parameters.measurementSensitivity) ?? 0)} />
+            <Metric label={labels.playground.fieldIntensity} value={formatNumber(asNumber(parameters.fieldIntensity) ?? 0)} />
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <Metric label={labels.energyGap} value={`${formatNumber(asNumber(energyGap.orders) ?? 0)} ${labels.orders.toLowerCase()}`} />
+            <Metric label={labels.scaleGap} value={`${formatNumber(asNumber(scaleGap.orders) ?? 0)} ${labels.orders.toLowerCase()}`} />
+            <Metric label={labels.measurementFeasibility} value={asBoolean(measurement.feasible) ? labels.feasible : labels.notFeasible} />
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <ImpactMetric label={labels.researchProgress} value={asNumber(impact.researchProgress) ?? 0} />
+            <ImpactMetric label={labels.functionalityProgress} value={asNumber(impact.functionalityProgress) ?? 0} />
+            <ImpactMetric label={labels.testabilityProgress} value={asNumber(impact.testabilityProgress) ?? 0} />
+          </div>
+
+          <div className="mt-5 rounded-xl border border-amber-300/[0.12] bg-amber-300/[0.025] p-4">
+            <div className="mono-label">{labels.mainBlocker}</div>
+            <p className="mt-2 text-xs leading-5 text-amber-100/75">{asString(result.mainRemainingBlocker) || '—'}</p>
+          </div>
+
+          {asString(parameters.notes) && <p className="mt-4 text-xs italic leading-5 text-[#78999b]">{asString(parameters.notes)}</p>}
+        </>
+      )}
+
       <p className="mt-5 border-t border-cyan-100/[0.07] pt-5 text-xs leading-6 text-[#91adaf]">{explanation}</p>
     </GlassPanel>
   );
@@ -75,6 +127,11 @@ export function CalculationCard({calculation, locale, labels, subject}: Calculat
 
 function Metric({label, value}: {label: string; value: string}) {
   return <div className="rounded-xl border border-cyan-100/[0.07] bg-black/30 p-4"><div className="mono-label">{label}</div><div className="mt-3 font-mono text-lg text-cyan-100/80">{value}</div></div>;
+}
+
+function ImpactMetric({label, value}: {label: string; value: number}) {
+  const positive = value >= 0;
+  return <div className="rounded-xl border border-emerald-300/[0.1] bg-emerald-300/[0.025] p-4"><div className="mono-label">{label}</div><div className={`mt-3 font-mono text-lg ${positive ? 'text-emerald-200/80' : 'text-red-200/80'}`}>{positive ? '+' : ''}{value.toFixed(1)}</div></div>;
 }
 
 function asRecord(value: Prisma.JsonValue): Record<string, Prisma.JsonValue> {
@@ -89,6 +146,10 @@ function asString(value: Prisma.JsonValue | undefined): string {
   return typeof value === 'string' ? value : '';
 }
 
+function asBoolean(value: Prisma.JsonValue | undefined): boolean {
+  return value === true;
+}
+
 function asGapLevel(value: Prisma.JsonValue | undefined): CalculationGapLevel | null {
   return value === 'LOW' || value === 'MEDIUM' || value === 'HIGH' || value === 'EXTREME' ? value : null;
 }
@@ -97,4 +158,11 @@ function formatNumber(value: number): string {
   if (value === 0) return '0';
   if (Math.abs(value) >= 1e4 || Math.abs(value) < 1e-3) return value.toExponential(2);
   return Number(value.toPrecision(3)).toLocaleString('en-US');
+}
+
+function getEffectLabel(value: string, labels: ParameterPlaygroundLabels): string {
+  if (value === 'LOW') return labels.effects.low;
+  if (value === 'HIGH') return labels.effects.high;
+  if (value === 'EXTREME') return labels.effects.extreme;
+  return labels.effects.medium;
 }

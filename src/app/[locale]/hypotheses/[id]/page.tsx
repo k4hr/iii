@@ -4,6 +4,8 @@ import {ProgressPanel} from '@/components/hypotheses/ProgressPanel';
 import {ConditionCard} from '@/components/hypotheses/ConditionCard';
 import {VisualSceneCards} from '@/components/visual-lab/VisualSceneCards';
 import {CalculationCard} from '@/components/calculations/CalculationCard';
+import {ParameterPlayground} from '@/components/calculations/ParameterPlayground';
+import {LabLogTimeline} from '@/components/lab-log/LabLogTimeline';
 import {SourceCandidateCard} from '@/components/sources/SourceCandidateCard';
 import {GlassPanel} from '@/components/ui/GlassPanel';
 import {GlowButton} from '@/components/ui/GlowButton';
@@ -12,7 +14,9 @@ import {createMockAnalysisTranslation} from '@/lib/ai/analyze-hypothesis';
 import {localizeMockValue} from '@/lib/locale/mock-copy';
 import {getEnumLabel, getExperimentDifficultyLabel, getExperimentTypeLabel, getSafetyLevelLabel, getVerdictLevelLabel} from '@/lib/locale/enum-labels';
 import {getLocalizedSourceSummary} from '@/lib/sources/source-discovery';
-import {runCalculationAction} from '@/server/actions/calculations';
+import {isParameterCalculationInput} from '@/lib/calculations/order-of-magnitude';
+import {buildLabLog} from '@/lib/lab-log/build-lab-log';
+import {runCalculationAction, runParameterCalculationAction} from '@/server/actions/calculations';
 import {discoverSourcesAction} from '@/server/actions/sources';
 
 export default async function HypothesisPage({params}: {params: Promise<{locale: string; id: string}>}) {
@@ -23,6 +27,7 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
   const c = await getTranslations('common');
   const calc = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'calculations'});
   const sourceT = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'sources'});
+  const labT = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'labLog'});
   const hypothesis = await prisma.hypothesis.findUnique({
     where: {id},
     include: {
@@ -38,6 +43,7 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
   });
 
   if (!hypothesis || !hypothesis.analyses[0]) return <div>Not found</div>;
+  const labLogItems = await buildLabLog({locale: locale === 'ru' ? 'ru' : 'en', hypothesisId: id});
   const analysis = hypothesis.analyses[0];
   const translation = createMockAnalysisTranslation({title: hypothesis.originalTitle, text: hypothesis.originalText, locale});
   const conditions = hypothesis.conditions.map(condition => localizeMockValue(condition, locale));
@@ -55,6 +61,51 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
     ratio: calc('ratio'),
     orders: calc('orders'),
     preliminary: calc('preliminary'),
+    energyGap: calc('energyGap'),
+    scaleGap: calc('scaleGap'),
+    measurementFeasibility: calc('measurementFeasibility'),
+    feasible: calc('feasible'),
+    notFeasible: calc('notFeasible'),
+    mainBlocker: calc('mainBlocker'),
+    researchProgress: calc('researchProgress'),
+    functionalityProgress: calc('functionalityProgress'),
+    testabilityProgress: calc('testabilityProgress'),
+    playground: {
+      title: calc('playground.title'),
+      description: calc('playground.description'),
+      objectScale: calc('playground.objectScale'),
+      objectMassKg: calc('playground.objectMassKg'),
+      objectSizeM: calc('playground.objectSizeM'),
+      availableEnergyJ: calc('playground.availableEnergyJ'),
+      desiredEffect: calc('playground.desiredEffect'),
+      observationTimeS: calc('playground.observationTimeS'),
+      measurementSensitivity: calc('playground.measurementSensitivity'),
+      sensitivityHelp: calc('playground.sensitivityHelp'),
+      fieldIntensity: calc('playground.fieldIntensity'),
+      notes: calc('playground.notes'),
+      notesPlaceholder: calc('playground.notesPlaceholder'),
+      run: calc('playground.run'),
+      effects: {low: calc('playground.effects.low'), medium: calc('playground.effects.medium'), high: calc('playground.effects.high'), extreme: calc('playground.effects.extreme')},
+    },
+  };
+  const latestParameterRun = hypothesis.calculationRuns.find(calculation => !calculation.breakthroughSessionId && isParameterCalculationInput(calculation.inputJson));
+  const calculationHistory = latestParameterRun
+    ? hypothesis.calculationRuns.filter(calculation => calculation.id !== latestParameterRun.id)
+    : hypothesis.calculationRuns;
+  const labLogLabels = {
+    title: labT('title'),
+    workspaceTitle: labT('workspaceTitle'),
+    events: labT('events'),
+    details: labT('details'),
+    noEvents: labT('noEvents'),
+    sourceTypes: {
+      hypothesis: labT('sourceTypes.hypothesis'), condition: labT('sourceTypes.condition'), breakthrough: labT('sourceTypes.breakthrough'),
+      idea: labT('sourceTypes.idea'), calculation: labT('sourceTypes.calculation'), source: labT('sourceTypes.source'),
+      experiment: labT('sourceTypes.experiment'), simulation: labT('sourceTypes.simulation'), system: labT('sourceTypes.system'),
+    },
+    severity: {
+      info: labT('severity.info'), success: labT('severity.success'), warning: labT('severity.warning'), critical: labT('severity.critical'),
+    },
   };
 
   return (
@@ -95,15 +146,32 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
             ))}
           </div>
         </GlassPanel>
-        {hypothesis.calculationRuns.length ? (
+        <div className="mt-4">
+          <ParameterPlayground
+            action={runParameterCalculationAction.bind(null, locale, hypothesis.id, undefined, undefined)}
+            defaultScale={analysis.scale}
+            labels={calculationLabels.playground}
+            locale={locale}
+          />
+        </div>
+        {latestParameterRun && (
+          <div className="mt-6">
+            <SectionHeader code="LATEST" title={calc('latestResult')} detail={getCalculationGapLabelFromRun(latestParameterRun.resultJson, locale)} />
+            <div className="mt-4"><CalculationCard calculation={latestParameterRun} labels={calculationLabels} locale={locale} subject={hypothesis.originalTitle} /></div>
+          </div>
+        )}
+        {calculationHistory.length ? (
+          <div className="mt-6">
+            <SectionHeader code="HISTORY" title={calc('runHistory')} detail={`${calculationHistory.length} ${calc('history')}`} />
           <div className="mt-4 grid gap-4 xl:grid-cols-2">
-            {hypothesis.calculationRuns.map(calculation => {
+            {calculationHistory.map(calculation => {
               const calculationCondition = calculation.condition ? localizeMockValue(calculation.condition, locale) : null;
               return <CalculationCard calculation={calculation} labels={calculationLabels} locale={locale} subject={calculationCondition?.title || hypothesis.originalTitle} key={calculation.id} />;
             })}
           </div>
+          </div>
         ) : (
-          <p className="mt-4 rounded-xl border border-dashed border-cyan-100/[0.1] px-5 py-4 text-xs text-[#78999b]">{calc('empty')}</p>
+          !latestParameterRun && <p className="mt-4 rounded-xl border border-dashed border-cyan-100/[0.1] px-5 py-4 text-xs text-[#78999b]">{calc('empty')}</p>
         )}
       </section>
 
@@ -186,6 +254,10 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
         )}
       </section>
 
+      <section>
+        <LabLogTimeline items={labLogItems} locale={locale} labels={labLogLabels} />
+      </section>
+
       <section className="grid gap-4 md:grid-cols-3">
         <SystemCounter title={t('tabs.simulations')} value={hypothesis.simulationRuns.length} locale={locale} />
         <SystemCounter title={t('tabs.sources')} value={sources.length} locale={locale} />
@@ -205,4 +277,10 @@ function DataPoint({label, value, wide = false}: {label: string; value?: string 
 
 function SystemCounter({title, value, locale = 'en'}: {title: string; value: number; locale?: string}) {
   return <GlassPanel className="flex items-center justify-between p-5"><div><div className="mono-label">{locale === 'ru' ? 'Канал данных' : 'Data channel'}</div><h3 className="mt-2 text-sm font-semibold text-cyan-50">{title}</h3></div><div className="font-mono text-3xl font-light text-cyan-200/75">{String(value).padStart(2, '0')}</div></GlassPanel>;
+}
+
+function getCalculationGapLabelFromRun(resultJson: unknown, locale: string): string {
+  if (!resultJson || typeof resultJson !== 'object' || Array.isArray(resultJson)) return '—';
+  const gapLevel = (resultJson as {gapLevel?: unknown}).gapLevel;
+  return typeof gapLevel === 'string' ? getEnumLabel(gapLevel, locale) : '—';
 }

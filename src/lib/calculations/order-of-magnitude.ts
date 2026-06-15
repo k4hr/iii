@@ -21,6 +21,55 @@ export type CalculationContext = {
   completionScore?: number | null;
 };
 
+export type DesiredEffectLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'EXTREME';
+
+export type ParameterEstimateInput = {
+  objectScale: Scale;
+  objectMassKg: number;
+  objectSizeM: number;
+  availableEnergyJ: number;
+  desiredEffect: DesiredEffectLevel;
+  observationTimeS: number;
+  measurementSensitivity: number;
+  fieldIntensity: number;
+  notes: string;
+};
+
+export type ParameterEstimateResult = {
+  title: string;
+  calculationType: CalculationType;
+  input: {
+    mode: 'parameter_playground';
+    subject: string;
+    parameters: ParameterEstimateInput;
+    requiredValue: number;
+    availableValue: number;
+    unit: string;
+    comparison: 'required_over_available';
+    basis: string;
+  };
+  result: {
+    ratio: number;
+    gapOrders: number;
+    gapLevel: CalculationGapLevel;
+    requiredValue: number;
+    availableValue: number;
+    unit: string;
+    energyGap: {ratio: number; orders: number; level: CalculationGapLevel};
+    scaleGap: {ratio: number; orders: number; level: CalculationGapLevel};
+    measurementFeasibility: {predictedSignal: number; sensitivityThreshold: number; margin: number; feasible: boolean};
+    testabilityChange: number;
+    functionalityImpact: number;
+    impact: {
+      researchProgress: number;
+      functionalityProgress: number;
+      testabilityProgress: number;
+    };
+    mainRemainingBlocker: string;
+  };
+  explanation: string;
+};
+
 export type OrderOfMagnitudeResult = {
   title: string;
   calculationType: CalculationType;
@@ -82,11 +131,35 @@ const availableEnergyByScale: Record<Scale, number> = {
   UNKNOWN: 1e6,
 };
 
+const nominalSizeByScale: Record<Scale, number> = {
+  QUANTUM: 1e-18,
+  ATOMIC: 1e-10,
+  MOLECULAR: 1e-9,
+  NANO: 1e-7,
+  MICRO: 1e-5,
+  HUMAN: 1,
+  PLANETARY: 1e7,
+  STELLAR: 1e9,
+  COSMOLOGICAL: 1e22,
+  UNKNOWN: 1,
+};
+
+const desiredEffectFactor: Record<DesiredEffectLevel, number> = {
+  LOW: 1e-12,
+  MEDIUM: 1e-9,
+  HIGH: 1e-6,
+  EXTREME: 1e-3,
+};
+
 export function classifyOrderOfMagnitudeGap(gapOrders: number): CalculationGapLevel {
   if (gapOrders <= 1) return 'LOW';
   if (gapOrders <= 3) return 'MEDIUM';
   if (gapOrders <= 6) return 'HIGH';
   return 'EXTREME';
+}
+
+export function isParameterCalculationInput(value: unknown): boolean {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value) && (value as {mode?: unknown}).mode === 'parameter_playground');
 }
 
 export function getCalculationTypeLabel(type: CalculationType, locale: string): string {
@@ -136,6 +209,89 @@ export function createCalculationExplanation(
   return ru
     ? `Грубая оценка сравнивает требуемое значение ${formatScientific(values.requiredValue)} ${unit} с доступным ориентиром ${formatScientific(values.availableValue)} ${unit}. Разрыв составляет примерно ${formatScientific(values.ratio)}×, или ${values.gapOrders.toFixed(1)} порядка величины. Уровень: ${getCalculationGapLabel(values.gapLevel, locale).toLowerCase()}. Результат задаёт направление для проверки и не является точным инженерным расчётом.`
     : `This rough estimate compares a required value of ${formatScientific(values.requiredValue)} ${unit} with an available reference of ${formatScientific(values.availableValue)} ${unit}. The gap is approximately ${formatScientific(values.ratio)}×, or ${values.gapOrders.toFixed(1)} orders of magnitude. Level: ${getCalculationGapLabel(values.gapLevel, locale).toLowerCase()}. This result guides further validation and is not a precise engineering calculation.`;
+}
+
+export function runParameterEstimate(
+  locale: string,
+  parameters: ParameterEstimateInput,
+  context: CalculationContext
+): ParameterEstimateResult {
+  const normalized = normalizeParameters(parameters);
+  const effectFactor = desiredEffectFactor[normalized.desiredEffect];
+  const durationFactor = Math.max(1, Math.sqrt(normalized.observationTimeS));
+  const fieldFactor = Math.max(0.01, normalized.fieldIntensity);
+  const requiredEnergyJ = roundSignificant(
+    Math.max(1e-12, normalized.objectMassKg) * 8.98755179e16 * effectFactor * fieldFactor * durationFactor
+  );
+  const energyRatio = roundSignificant(requiredEnergyJ / Math.max(1e-30, normalized.availableEnergyJ));
+  const energyOrders = positiveOrders(energyRatio);
+
+  const nominalSize = nominalSizeByScale[normalized.objectScale];
+  const effectiveSize = Math.max(normalized.objectSizeM, nominalSize);
+  const scaleRatio = roundSignificant(Math.max(1, effectiveSize / 1e-6));
+  const scaleOrders = positiveOrders(scaleRatio);
+
+  const predictedSignal = roundSignificant(
+    effectFactor * fieldFactor * Math.sqrt(normalized.observationTimeS) / Math.max(1, normalized.objectMassKg * effectiveSize)
+  );
+  const measurementMargin = roundSignificant(predictedSignal / Math.max(1e-30, normalized.measurementSensitivity));
+  const measurementOrders = positiveOrders(1 / Math.max(1e-30, measurementMargin));
+  const measurementFeasible = measurementMargin >= 1;
+
+  const combinedOrders = roundOne(Math.max(energyOrders, scaleOrders * 0.8, measurementOrders));
+  const gapLevel = classifyOrderOfMagnitudeGap(combinedOrders);
+  const energyLevel = classifyOrderOfMagnitudeGap(energyOrders);
+  const scaleLevel = classifyOrderOfMagnitudeGap(scaleOrders);
+  const researchProgress = clampProgress(6 + (measurementFeasible ? 8 : 3) + (normalized.notes ? 2 : 0));
+  const functionalityProgress = clampProgress(18 - energyOrders * 1.8 - scaleOrders * 0.7);
+  const testabilityProgress = clampProgress(24 - measurementOrders * 4 - scaleOrders * 0.8 + (normalized.observationTimeS >= 60 ? 3 : 0));
+  const mainBlockerKey = largestGapKey({energy: energyOrders, scale: scaleOrders * 0.8, measurement: measurementOrders});
+  const ru = locale.toLowerCase() === 'ru';
+  const blockerLabels = ru
+    ? {energy: 'Недостаточный доступный энергетический бюджет', scale: 'Слишком большой физический масштаб объекта', measurement: 'Недостаточная чувствительность измерений'}
+    : {energy: 'Insufficient available energy budget', scale: 'Object scale remains too large', measurement: 'Measurement sensitivity is insufficient'};
+  const subject = context.conditionTitle || context.hypothesisTitle;
+  const explanation = ru
+    ? `Параметрическая оценка требует около ${formatScientific(requiredEnergyJ)} Дж при доступных ${formatScientific(normalized.availableEnergyJ)} Дж. Энергетический разрыв: ${energyOrders.toFixed(1)} порядка; разрыв масштаба: ${scaleOrders.toFixed(1)} порядка. Ожидаемый относительный сигнал ${formatScientific(predictedSignal)} сравнивается с порогом ${formatScientific(normalized.measurementSensitivity)}. ${measurementFeasible ? 'Выбранный порог позволяет наблюдать оценочный сигнал.' : 'Оценочный сигнал остаётся ниже выбранного порога измерения.'} Расчёт предназначен для сравнения сценариев, а не для подтверждения физической реализуемости.`
+    : `The parameter estimate requires about ${formatScientific(requiredEnergyJ)} J against ${formatScientific(normalized.availableEnergyJ)} J available. The energy gap is ${energyOrders.toFixed(1)} orders and the scale gap is ${scaleOrders.toFixed(1)} orders. A predicted relative signal of ${formatScientific(predictedSignal)} is compared with a ${formatScientific(normalized.measurementSensitivity)} threshold. ${measurementFeasible ? 'The selected threshold can resolve the estimated signal.' : 'The estimated signal remains below the selected measurement threshold.'} This calculation compares scenarios; it does not establish physical feasibility.`;
+
+  return {
+    title: `${ru ? 'Параметрическая оценка' : 'Parameter estimate'}: ${subject}`,
+    calculationType: CalculationType.GENERIC_ORDER_OF_MAGNITUDE,
+    input: {
+      mode: 'parameter_playground',
+      subject,
+      parameters: normalized,
+      requiredValue: requiredEnergyJ,
+      availableValue: normalized.availableEnergyJ,
+      unit: 'J',
+      comparison: 'required_over_available',
+      basis: ru
+        ? 'Детерминированная оценка по массе, масштабу, энергии, длительности, интенсивности поля и чувствительности измерений.'
+        : 'Deterministic estimate using mass, scale, energy, duration, field intensity and measurement sensitivity.',
+    },
+    result: {
+      ratio: energyRatio,
+      gapOrders: combinedOrders,
+      gapLevel,
+      requiredValue: requiredEnergyJ,
+      availableValue: normalized.availableEnergyJ,
+      unit: 'J',
+      energyGap: {ratio: energyRatio, orders: roundOne(energyOrders), level: energyLevel},
+      scaleGap: {ratio: scaleRatio, orders: roundOne(scaleOrders), level: scaleLevel},
+      measurementFeasibility: {
+        predictedSignal,
+        sensitivityThreshold: normalized.measurementSensitivity,
+        margin: measurementMargin,
+        feasible: measurementFeasible,
+      },
+      testabilityChange: testabilityProgress,
+      functionalityImpact: functionalityProgress,
+      impact: {researchProgress, functionalityProgress, testabilityProgress},
+      mainRemainingBlocker: blockerLabels[mainBlockerKey],
+    },
+    explanation,
+  };
 }
 
 export function selectCalculationType(context: CalculationContext): CalculationType {
@@ -237,6 +393,40 @@ function estimateValues(type: CalculationType, scale: Scale, gapOrders: number) 
 function roundSignificant(value: number): number {
   if (value === 0) return 0;
   return Number(value.toPrecision(4));
+}
+
+function normalizeParameters(parameters: ParameterEstimateInput): ParameterEstimateInput {
+  return {
+    objectScale: parameters.objectScale in nominalSizeByScale ? parameters.objectScale : Scale.UNKNOWN,
+    objectMassKg: positiveFinite(parameters.objectMassKg, 1),
+    objectSizeM: positiveFinite(parameters.objectSizeM, 1),
+    availableEnergyJ: positiveFinite(parameters.availableEnergyJ, 1e6),
+    desiredEffect: parameters.desiredEffect in desiredEffectFactor ? parameters.desiredEffect : 'MEDIUM',
+    observationTimeS: positiveFinite(parameters.observationTimeS, 1),
+    measurementSensitivity: positiveFinite(parameters.measurementSensitivity, 1e-9),
+    fieldIntensity: positiveFinite(parameters.fieldIntensity, 1),
+    notes: parameters.notes.trim().slice(0, 1000),
+  };
+}
+
+function positiveFinite(value: number, fallback: number): number {
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function positiveOrders(ratio: number): number {
+  return Math.max(0, Math.log10(Math.max(1, ratio)));
+}
+
+function clampProgress(value: number): number {
+  return Math.round(Math.min(30, Math.max(-20, value)) * 10) / 10;
+}
+
+function roundOne(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+function largestGapKey(gaps: {energy: number; scale: number; measurement: number}): keyof typeof gaps {
+  return (Object.entries(gaps) as Array<[keyof typeof gaps, number]>).sort((a, b) => b[1] - a[1])[0][0];
 }
 
 function formatScientific(value: number): string {
