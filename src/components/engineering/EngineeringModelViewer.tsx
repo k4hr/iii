@@ -5,7 +5,7 @@ import {Edges, Grid, Html, Line, OrbitControls, useCursor} from '@react-three/dr
 import {useEffect, useMemo, useRef, useState} from 'react';
 import * as THREE from 'three';
 import type {OrbitControls as OrbitControlsImpl} from 'three-stdlib';
-import type {CanonicalEngineeringModel, CanonicalEngineeringModule} from '@/lib/engineering/engineering-model-schema';
+import type {CanonicalEngineeringModel, EngineeringSeverity} from '@/lib/engineering/engineering-model-schema';
 import {buildEngineeringRenderModules, type EngineeringRenderModule, type Vector3Tuple} from '@/lib/engineering/build-engineering-model';
 
 type EngineeringModelViewerProps = {
@@ -86,10 +86,11 @@ function ModuleMesh({module, selected, exploded, onSelect}: {module: Engineering
     >
       <HintGeometry highlighted={selected || hovered} module={module} />
       <StatusBeacon module={module} />
+      <OverlayBeacons module={module} />
       {(selected || hovered) && (
         <Html center position={[0, module.scale[1] + .52, 0]} style={{pointerEvents: 'none'}} transform={false}>
           <div className="whitespace-nowrap rounded border border-cyan-100/20 bg-[#02090b]/90 px-2 py-1 font-mono text-[8px] tracking-[.08em] text-cyan-50/80 uppercase shadow-[0_0_18px_rgba(34,211,201,.14)] backdrop-blur-md">
-            {module.name} / {module.feasibilityScore}%
+            {module.name} / {module.feasibilityScore}% / {module.overlays.length} overlays
           </div>
         </Html>
       )}
@@ -104,18 +105,18 @@ function HintGeometry({module, highlighted}: {module: EngineeringRenderModule; h
 function partsForHint(module: EngineeringRenderModule): PartSpec[] {
   const [x, y, z] = module.scale;
   switch (module.geometryHint) {
-    case 'core': return [sphere([0, 0, 0], [x, y, z]), torus([0, 0, 0], [x * 1.15, Math.max(.05, x * .08), z], [Math.PI / 2, 0, 0])];
-    case 'shell': return [box([0, 0, 0], [x * 2, y * 2, z * 2], .24, true), box([0, 0, 0], [x * 1.55, y * 1.55, z * 1.55], .5)];
-    case 'ring': return [torus([0, 0, 0], [x, Math.max(.08, y), z]), torus([0, 0, 0], [x * .72, Math.max(.05, y * .55), z * .72])];
-    case 'panel': return [box([0, 0, 0], [x * 2, y * 2, z * 2]), ...[-.45, 0, .45].map(offset => box([offset * x, 0, -z * 1.12], [x * .18, y * 1.35, z * .18]))];
-    case 'arm': return [cylinder([0, .35, 0], [x, y * .95, z], [0, 0, -.16]), cylinder([.16, -.55, 0], [x * .82, y * .75, z * .82], [0, 0, .12]), sphere([-.12, y * .62, 0], [x * 1.3, x * 1.3, z * 1.3])];
-    case 'leg': return [cylinder([0, .42, 0], [x, y, z]), cylinder([.08, -.72, 0], [x * .86, y * .78, z * .86]), box([.08, -y * .92, -.12], [x * 1.7, y * .18, z * 2.2])];
+    case 'body': return [box([0, 0, 0], [x * 2, y * 2, z * 2]), box([0, -.12, z * 1.1], [x * 1.4, y * 1.1, z * .55])];
+    case 'cabin': return [sphere([0, .08, 0], [x, y, z]), box([0, -.18, .1], [x * 1.8, y * .7, z * 1.7])];
+    case 'wing': return [box([0, 0, 0], [x * 2.4, y * 1.2, z]), box([-x * 1.3, .05, 0], [x * .45, y, z * 1.45]), box([x * 1.3, .05, 0], [x * .45, y, z * 1.45])];
     case 'rotor': return [torus([0, 0, 0], [x, Math.max(.05, y), z], [Math.PI / 2, 0, 0]), box([0, 0, 0], [x * 1.9, y * .35, z * .12]), box([0, 0, 0], [x * .12, y * .35, z * 1.9])];
-    case 'tank': return [cylinder([0, 0, 0], [x, y * 1.7, z]), sphere([0, y * .85, 0], [x, x, z]), sphere([0, -y * .85, 0], [x, x, z])];
-    case 'cell': return [-.45, 0, .45].flatMap(column => [-.32, .32].map(depth => cylinder([column * x * 2, 0, depth * z * 2], [x * .72, y * 1.7, z * .72])));
-    case 'probe': return [cylinder([0, 0, 0], [x, y * 1.5, z]), sphere([0, y * .82, 0], [x * 1.35, x * 1.35, z * 1.35]), cone([0, -y * .92, 0], [x * 1.1, y * .55, z * 1.1], [0, 0, Math.PI])];
-    case 'tube': return [cylinder([0, 0, 0], [x, y * 1.45, z]), torus([0, y * .55, 0], [x * 1.08, x * .11, z], [Math.PI / 2, 0, 0]), cone([0, -y * .9, 0], [x * 1.15, y * .62, z * 1.15], [0, 0, Math.PI])];
-    case 'block': return [box([0, 0, 0], [x * 2, y * 2, z * 2]), box([0, y * .72, 0], [x * 1.35, y * .16, z * 1.35])];
+    case 'thruster': return [cylinder([0, 0, 0], [x, y * 1.3, z], [Math.PI / 2, 0, 0]), cone([0, 0, z * 1.25], [x * 1.1, y * .75, z], [Math.PI / 2, 0, 0])];
+    case 'battery_pack': return [box([0, 0, 0], [x * 2, y * 1.4, z * 1.6]), ...[-.45, 0, .45].map(offset => cylinder([offset * x * 1.7, 0, 0], [x * .16, y * 1.8, z * .16], [0, 0, Math.PI / 2]))];
+    case 'control_core': return [box([0, 0, 0], [x * 1.8, y * 1.3, z * 1.4]), sphere([0, y * .9, 0], [x * .26, x * .26, z * .26])];
+    case 'heat_sink': return [box([0, 0, 0], [x * 2, y, z * 1.4]), ...[-.5, -.25, 0, .25, .5].map(offset => box([offset * x * 1.7, y * .65, 0], [x * .12, y * 1.4, z * 1.4]))];
+    case 'sensor_array': return [box([0, 0, 0], [x * 1.5, y, z * 1.2]), ...[-.35, 0, .35].map(offset => sphere([offset * x * 1.4, y * .8, 0], [x * .22, x * .22, z * .22]))];
+    case 'shield': return [box([0, 0, 0], [x * 2, y * .65, z * 1.8], .3, true), box([0, 0, -z * .45], [x * 1.7, y * .5, z * .25])];
+    case 'frame': return [box([0, 0, 0], [x * 2, y * .18, z * 1.6]), box([0, y * .55, 0], [x * .18, y * 1.2, z * 1.6]), box([0, -y * .55, 0], [x * .18, y * 1.2, z * 1.6])];
+    case 'cell_stack': return [-.5, 0, .5].flatMap(column => [-.34, .34].map(depth => cylinder([column * x * 1.8, 0, depth * z * 1.8], [x * .35, y * 1.6, z * .35])));
     default: return [box([0, 0, 0], [x * 1.8, y * 1.8, z * 1.8]), sphere([0, y * .65, 0], [x * .38, x * .38, z * .38])];
   }
 }
@@ -146,6 +147,28 @@ function InterfaceLine({from, to, type, exploded}: {from: EngineeringRenderModul
 function StatusBeacon({module}: {module: EngineeringRenderModule}) {
   const color = {info: '#5eead4', success: '#4ade80', warning: '#fbbf24', critical: '#fb7185'}[module.severity];
   return <mesh position={[0, module.scale[1] + .28, 0]}><sphereGeometry args={[.07, 12, 8]} /><meshBasicMaterial color={color} /><pointLight color={color} distance={1.8} intensity={3} /></mesh>;
+}
+
+function OverlayBeacons({module}: {module: EngineeringRenderModule}) {
+  return (
+    <group>
+      {module.overlays.slice(0, 5).map((overlay, index) => {
+        const angle = index * 1.256;
+        const color = overlayColor(overlay.severity);
+        return (
+          <mesh key={overlay.id} position={[Math.cos(angle) * (module.scale[0] + .22), module.scale[1] + .1 + index * .045, Math.sin(angle) * (module.scale[2] + .22)]}>
+            <sphereGeometry args={[.045, 10, 8]} />
+            <meshBasicMaterial color={color} />
+            <pointLight color={color} distance={1.2} intensity={1.4} />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
+function overlayColor(severity: EngineeringSeverity): string {
+  return {info: '#67e8f9', success: '#4ade80', warning: '#fbbf24', critical: '#fb7185'}[severity];
 }
 
 function box(position: Vector3Tuple, scale: Vector3Tuple, opacity?: number, wireframe?: boolean): PartSpec { return {geometry: 'box', position, scale, opacity, wireframe}; }

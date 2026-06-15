@@ -218,6 +218,10 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
       title: source.title,
       relationship: source.relationshipToHypothesis,
     })),
+    experiments: experiments.map(experiment => ({
+      id: experiment.id,
+      title: experiment.title,
+    })),
     breakthroughSessions: visualLabBreakthroughs.map(session => ({
       id: session.id,
       conditionId: session.conditionId,
@@ -386,6 +390,7 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
             conditions: visualLabConditions.map(item => ({id: item.id, title: item.title, href: item.href})),
             calculations: visualLabCalculations.map(item => ({id: item.id, title: item.title, href: item.href})),
             sources: visualLabSources.map(item => ({id: item.id, title: item.title, href: item.href})),
+            experiments: experiments.map(item => ({id: item.id, title: item.title, href: `/${locale}/hypotheses/${hypothesis.id}#experiments`})),
             breakthroughs: visualLabBreakthroughs.map(item => ({id: item.id, conditionId: item.conditionId, title: item.title, href: item.href})),
           }}
         />

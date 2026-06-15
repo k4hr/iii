@@ -6,8 +6,8 @@ import {useEffect, useMemo, useRef, useState} from 'react';
 import {EngineeringBlueprintOverlay} from '@/components/engineering/EngineeringBlueprintOverlay';
 import {EngineeringChartsPanel} from '@/components/engineering/EngineeringChartsPanel';
 import {EngineeringModelViewer} from '@/components/engineering/EngineeringModelViewer';
-import {buildEngineeringRenderModules, type EngineeringSeverity} from '@/lib/engineering/build-engineering-model';
-import type {CanonicalEngineeringModel} from '@/lib/engineering/engineering-model-schema';
+import {buildEngineeringRenderModules} from '@/lib/engineering/build-engineering-model';
+import type {EngineeringSeverity, CanonicalEngineeringModel} from '@/lib/engineering/engineering-model-schema';
 
 export type EngineeringVisualLabLabels = {
   kicker: string;
@@ -40,24 +40,31 @@ export type EngineeringRelatedRecords = {
   conditions: Array<{id: string; title: string; href?: string}>;
   calculations: Array<{id: string; title: string; href?: string}>;
   sources: Array<{id: string; title: string; href?: string}>;
+  experiments?: Array<{id: string; title: string; href?: string}>;
   breakthroughs: Array<{id: string; conditionId: string; title: string; href?: string}>;
 };
 
 export function EngineeringVisualLab({model, labels, records}: {model: CanonicalEngineeringModel; labels: EngineeringVisualLabLabels; records?: EngineeringRelatedRecords}) {
   const renderModules = useMemo(() => buildEngineeringRenderModules(model), [model]);
-  const [selectedModuleId, setSelectedModuleId] = useState(model.modules[0]?.id ?? '');
+  const [selectedModuleId, setSelectedModuleId] = useState(model.physicalModules[0]?.id ?? '');
   const [exploded, setExploded] = useState(false);
   const [resetSignal, setResetSignal] = useState(0);
   const panelRef = useRef<HTMLDivElement>(null);
-  const selectedModule = model.modules.find(module => module.id === selectedModuleId) ?? model.modules[0];
+  const selectedModule = model.physicalModules.find(module => module.id === selectedModuleId) ?? model.physicalModules[0];
   const selectedRenderModule = renderModules.find(module => module.id === selectedModule?.id) ?? renderModules[0];
 
-  const linked = useMemo(() => ({
-    conditions: records?.conditions.filter(item => selectedModule?.linkedConditionIds.includes(item.id)) ?? [],
-    calculations: records?.calculations.filter(item => selectedModule?.linkedCalculationIds.includes(item.id)) ?? [],
-    sources: records?.sources.filter(item => selectedModule?.linkedSourceIds.includes(item.id)) ?? [],
-    breakthroughs: records?.breakthroughs.filter(item => selectedModule?.linkedConditionIds.includes(item.conditionId)) ?? [],
-  }), [records, selectedModule]);
+  const linked = useMemo(() => {
+    const overlays = model.researchOverlays.filter(overlay => overlay.linkedModuleId === selectedModule?.id);
+    const experimentIds = new Set(overlays.filter(overlay => overlay.type === 'experiment').map(overlay => overlay.id.replace(/^experiment-/, '')));
+    return {
+      overlays,
+      conditions: records?.conditions.filter(item => selectedModule?.linkedConditionIds.includes(item.id)) ?? [],
+      calculations: records?.calculations.filter(item => selectedModule?.linkedCalculationIds.includes(item.id)) ?? [],
+      sources: records?.sources.filter(item => selectedModule?.linkedSourceIds.includes(item.id)) ?? [],
+      experiments: records?.experiments?.filter(item => experimentIds.has(item.id)) ?? [],
+      breakthroughs: records?.breakthroughs.filter(item => selectedModule?.linkedConditionIds.includes(item.conditionId)) ?? [],
+    };
+  }, [records, selectedModule, model.researchOverlays]);
 
   useEffect(() => {
     const panel = panelRef.current;
@@ -67,8 +74,8 @@ export function EngineeringVisualLab({model, labels, records}: {model: Canonical
   }, [selectedModuleId]);
 
   if (!selectedModule || !selectedRenderModule) return null;
-  const largestGap = model.modules.reduce<number | null>((value, module) => module.gapOrders === undefined ? value : value === null ? module.gapOrders : Math.max(value, module.gapOrders), null);
-  const criticalCount = model.modules.filter(module => module.priority === 'critical').length;
+  const largestGap = model.researchOverlays.reduce<number | null>((value, overlay) => overlay.gapOrders === undefined ? value : value === null ? overlay.gapOrders : Math.max(value, overlay.gapOrders), null);
+  const criticalCount = model.researchOverlays.filter(overlay => overlay.severity === 'critical').length;
 
   return (
     <section className="overflow-hidden rounded-[1.75rem] border border-cyan-100/[0.1] bg-[#020708]/95 shadow-[0_0_80px_rgba(24,215,203,.055)]">
@@ -100,7 +107,9 @@ export function EngineeringVisualLab({model, labels, records}: {model: Canonical
               <StatusPill label={labels.severity[selectedRenderModule.severity]} severity={selectedRenderModule.severity} />
             </div>
             <p className="mt-3 text-xs font-medium text-cyan-50/65">{selectedModule.role}</p>
-            <p className="mt-2 text-xs leading-6 text-[#7e9fa1]">{selectedModule.description}</p>
+            <div className="mt-4 flex flex-wrap gap-1.5">
+              {linked.overlays.slice(0, 6).map(overlay => <StatusPill key={overlay.id} label={overlay.gapOrders === undefined ? overlay.title : `${overlay.title} / ${overlay.gapOrders} OOM`} severity={overlay.severity} />)}
+            </div>
             <div className="mt-5">
               <div className="flex justify-between font-mono text-[9px] tracking-[.08em] text-cyan-100/45 uppercase"><span>{labels.moduleProgress}</span><span>{selectedModule.feasibilityScore}%</span></div>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/[0.06]"><div className="h-full rounded-full bg-gradient-to-r from-cyan-700 to-cyan-300" style={{width: `${selectedModule.feasibilityScore}%`}} /></div>
@@ -108,7 +117,7 @@ export function EngineeringVisualLab({model, labels, records}: {model: Canonical
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <MetricCard label={labels.artifactType} value={model.artifactClass.replaceAll('_', ' ')} />
+            <MetricCard label={labels.artifactType} value={model.artifactLabel} />
             <MetricCard label={labels.gapOrders} value={largestGap === null ? '—' : `${largestGap} OOM`} />
             <MetricCard label={labels.criticalModules} value={String(criticalCount).padStart(2, '0')} />
             <MetricCard label={labels.sourceCandidates} value={String(records?.sources.length ?? 0).padStart(2, '0')} />
@@ -118,6 +127,7 @@ export function EngineeringVisualLab({model, labels, records}: {model: Canonical
           <LinkedPanel items={linked.conditions} label={labels.linkedBlockers} noItems={labels.noLinkedItems} open={labels.open} />
           <LinkedPanel items={linked.calculations} label={labels.linkedCalculations} noItems={labels.noLinkedItems} open={labels.open} />
           <LinkedPanel items={linked.sources} label={labels.sourceCandidates} noItems={labels.noLinkedItems} open={labels.open} />
+          {linked.experiments.length > 0 && <LinkedPanel items={linked.experiments} label={labels.charts} noItems={labels.noLinkedItems} open={labels.open} />}
           {linked.breakthroughs.length > 0 && <LinkedPanel items={linked.breakthroughs} label={labels.activeBreakthroughs} noItems={labels.noLinkedItems} open={labels.open} />}
           <InfoPanel label={labels.nextEngineeringStep} value={model.nextEngineeringStep} />
         </aside>
@@ -141,7 +151,7 @@ function StatusPill({label, severity}: {label: string; severity: EngineeringSeve
 }
 
 function MetricCard({label, value}: {label: string; value: string}) {
-  return <div className="rounded-xl border border-cyan-100/[0.07] bg-black/25 p-3"><div className="font-mono text-[8px] tracking-[.08em] text-cyan-100/35 uppercase">{label}</div><div className="mt-2 text-xs font-medium text-cyan-50/75 capitalize">{value}</div></div>;
+  return <div className="rounded-xl border border-cyan-100/[0.07] bg-black/25 p-3"><div className="font-mono text-[8px] tracking-[.08em] text-cyan-100/35 uppercase">{label}</div><div className="mt-2 text-xs font-medium text-cyan-50/75">{value}</div></div>;
 }
 
 function InfoPanel({label, value}: {label: string; value: string}) {
