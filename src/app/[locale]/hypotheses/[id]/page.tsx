@@ -5,6 +5,7 @@ import {ConditionCard} from '@/components/hypotheses/ConditionCard';
 import {VisualSceneCards} from '@/components/visual-lab/VisualSceneCards';
 import {AnimatedVisualLab} from '@/components/visual-lab/AnimatedVisualLab';
 import {EngineeringVisualLab} from '@/components/engineering/EngineeringVisualLab';
+import {RegenerateEngineeringModelButton} from '@/components/engineering/RegenerateEngineeringModelButton';
 import {CalculationCard} from '@/components/calculations/CalculationCard';
 import {ParameterPlayground} from '@/components/calculations/ParameterPlayground';
 import {LabLogTimeline} from '@/components/lab-log/LabLogTimeline';
@@ -23,6 +24,7 @@ import {parseEngineeringModel} from '@/lib/engineering/engineering-model-schema'
 import {enrichEngineeringModelContext, synthesizeEngineeringModelFallback} from '@/lib/engineering/generate-engineering-model';
 import {runCalculationAction, runParameterCalculationAction} from '@/server/actions/calculations';
 import {discoverSourcesAction} from '@/server/actions/sources';
+import {regenerateEngineeringModelAction} from '@/server/actions/hypotheses';
 import {getCurrentUser} from '@/lib/auth/current-user';
 import {notFound, redirect} from 'next/navigation';
 
@@ -383,6 +385,11 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
       </section>
 
       <section aria-label={t('tabs.engineering')} id="engineering-model">
+        <div className="mb-4 flex justify-end">
+          <form action={regenerateEngineeringModelAction.bind(null, locale, hypothesis.id)}>
+            <RegenerateEngineeringModelButton idleLabel={engineeringT('regenerate')} pendingLabel={engineeringT('regenerating')} />
+          </form>
+        </div>
         <EngineeringVisualLab
           labels={engineeringLabels}
           model={engineeringModel}

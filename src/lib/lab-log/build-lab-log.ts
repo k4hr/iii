@@ -348,6 +348,15 @@ function mapBreakthroughEvent(
       [labels.metadata.testabilityImpact]: numberValue(content.testabilityImpact),
     },
   };
+  if (type === 'AI_REASONING_STEP' && stringValue(content.eventKey) === 'ENGINEERING_MODEL_REGENERATED') return {
+    title: labels.engineeringModelRegenerated,
+    description: stringValue(content.message) || labels.engineeringModelRegeneratedDescription,
+    severity: 'success',
+    sourceType: 'system',
+    metadata: {
+      [labels.metadata.count]: numberValue(content.physicalModules),
+    },
+  };
   if (type === 'STATUS_CHANGED') return {title: labels.statusChanged, description: stringValue(content.description), severity: 'info', sourceType: 'breakthrough', metadata: {[labels.metadata.status]: getEnumLabel(stringValue(content.status), locale)}};
   if (type === 'USER_NOTE') return {title: labels.userNote, description: stringValue(content.note), severity: 'info', sourceType: 'idea', metadata: stringValue(content.note) ? {[labels.metadata.note]: stringValue(content.note)} : undefined};
   if (type === 'AI_REASONING_STEP') return {title: labels.deeperBreakdown, description: stringValue(content.description) || labels.analysisDescription, severity: 'info', sourceType: 'system'};
