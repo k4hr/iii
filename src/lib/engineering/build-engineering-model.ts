@@ -1,4 +1,4 @@
-export type EngineeringArtifactType = 'wearable_suit' | 'battery' | 'propulsion_system' | 'generic_device';
+export type EngineeringArtifactType = 'flying_vehicle' | 'wearable_suit' | 'battery' | 'propulsion_system' | 'generic_device';
 export type EngineeringSeverity = 'info' | 'success' | 'warning' | 'critical';
 export type EngineeringGeometry = 'box' | 'cylinder' | 'sphere' | 'torus';
 export type Vector3Tuple = [number, number, number];
@@ -98,6 +98,7 @@ type ModuleTemplate = Omit<EngineeringModule, 'id' | 'severity' | 'progress' | '
 };
 
 const artifactPatterns: Array<[EngineeringArtifactType, RegExp]> = [
+  ['flying_vehicle', /flying\s*(?:car|vehicle)|air\s*car|vehicle|drone|flight|летающ(?:ая|ий|ее)\s+машин|автомобил|машин|дрон|пол[её]т/i],
   ['wearable_suit', /iron\s*man|suit|armor|armour|exoskeleton|костюм|броня/i],
   ['battery', /battery|lithium|energy|батарея|аккумулятор/i],
   ['propulsion_system', /thrust|flight|engine|propulsion|двигатель|тяга|пол[её]т/i],
@@ -200,28 +201,36 @@ function finiteNumber(value: number | null | undefined): number | null {
 
 function artifactLabels(ru: boolean): Record<EngineeringArtifactType, string> {
   return ru
-    ? {wearable_suit: 'Носимый инженерный костюм', battery: 'Энергетический модуль', propulsion_system: 'Двигательная система', generic_device: 'Экспериментальное устройство'}
-    : {wearable_suit: 'Wearable engineering suit', battery: 'Energy storage module', propulsion_system: 'Propulsion system', generic_device: 'Experimental device'};
+    ? {flying_vehicle: 'Летающий транспорт', wearable_suit: 'Носимый инженерный костюм', battery: 'Энергетический модуль', propulsion_system: 'Двигательная система', generic_device: 'Экспериментальное устройство'}
+    : {flying_vehicle: 'Flying vehicle', wearable_suit: 'Wearable engineering suit', battery: 'Energy storage module', propulsion_system: 'Propulsion system', generic_device: 'Experimental device'};
 }
 
 function moduleTemplates(type: EngineeringArtifactType, ru: boolean): ModuleTemplate[] {
   const copy = moduleCopy(ru);
   const common: Record<EngineeringArtifactType, Array<[string, EngineeringGeometry, Vector3Tuple, Vector3Tuple, Vector3Tuple, string, string[]]>> = {
+    flying_vehicle: [
+      ['body', 'box', [0, 0, 0], [0, 0, 0], [1.65, .42, .82], '#35d5d0', ['body', 'chassis', 'frame', 'structure', 'корпус', 'каркас', 'конструкц']],
+      ['cabin', 'box', [0, .56, -.12], [0, 1.8, -.35], [.78, .38, .78], '#55b9ff', ['cabin', 'cockpit', 'pilot', 'кабин', 'пилот', 'экипаж']],
+      ['lift', 'box', [0, .05, 0], [0, .35, 2.25], [2.65, .12, .5], '#45e0b7', ['wing', 'rotor', 'lift', 'hover', 'крыл', 'ротор', 'подъ', 'висен']],
+      ['propulsion', 'cylinder', [0, -.02, .12], [0, -.15, -2.35], [.44, .52, .44], '#ff765f', ['thrust', 'engine', 'propulsion', 'motor', 'тяга', 'двигател', 'мотор']],
+      ['power', 'box', [0, -.52, .18], [0, -1.75, .35], [1.05, .22, .52], '#f4bf4f', ['power', 'energy', 'battery', 'fuel', 'энерг', 'аккумулятор', 'топлив']],
+      ['control', 'box', [0, .22, -1.02], [0, .55, -2.75], [.52, .2, .3], '#a58cff', ['control', 'navigation', 'stability', 'sensor', 'управлен', 'навигац', 'стабил', 'датчик']],
+    ],
     wearable_suit: [
-      ['frame', 'box', [0, 0, 0], [0, 0, 0], [1.45, 2.15, .62], '#35d5d0', ['frame', 'structure', 'material', 'каркас', 'материал']],
-      ['power', 'cylinder', [0, .15, .48], [0, .15, 1.75], [.7, .42, .7], '#f4bf4f', ['power', 'energy', 'battery', 'энерг', 'аккумулятор']],
-      ['actuators', 'cylinder', [-1.08, -.08, 0], [-2.2, -.08, 0], [.27, 1.55, .27], '#45e0b7', ['actuator', 'force', 'joint', 'привод', 'усили']],
-      ['control', 'sphere', [.62, .95, .42], [1.7, 1.65, 1.1], [.42, .42, .42], '#55b9ff', ['control', 'software', 'stability', 'управлен', 'контрол']],
-      ['thermal', 'torus', [0, -.72, .45], [0, -1.55, 1.35], [.62, .62, .25], '#ff765f', ['heat', 'thermal', 'cool', 'тепл', 'охлаж']],
-      ['sensors', 'sphere', [0, 1.62, 0], [0, 2.65, .45], [.52, .52, .52], '#a58cff', ['sensor', 'measure', 'signal', 'датчик', 'измер']],
+      ['torso', 'box', [0, .42, 0], [0, .42, 0], [.72, .82, .34], '#35d5d0', ['torso', 'frame', 'structure', 'material', 'торс', 'каркас', 'материал']],
+      ['helmet', 'sphere', [0, 1.62, 0], [0, 2.75, .25], [.48, .48, .48], '#55b9ff', ['helmet', 'sensor', 'vision', 'шлем', 'датчик', 'визор']],
+      ['arms', 'cylinder', [0, .35, 0], [2.1, .55, 0], [.24, .9, .24], '#45e0b7', ['arm', 'actuator', 'force', 'joint', 'рук', 'привод', 'усили']],
+      ['legs', 'cylinder', [0, -1.18, 0], [-2.05, -1.45, 0], [.3, 1.05, .3], '#45e0b7', ['leg', 'actuator', 'balance', 'ног', 'привод', 'баланс']],
+      ['power_core', 'cylinder', [0, .48, .42], [0, .48, 1.85], [.32, .18, .32], '#f4bf4f', ['power', 'energy', 'core', 'battery', 'энерг', 'ядро', 'аккумулятор']],
+      ['thrusters', 'cylinder', [0, -2.05, .08], [0, -3.15, .8], [.28, .45, .28], '#ff765f', ['thrust', 'flight', 'thermal', 'тяга', 'полёт', 'тепл', 'сопло']],
     ],
     battery: [
-      ['enclosure', 'box', [0, 0, 0], [0, 0, 0], [1.55, 2.15, .78], '#35d5d0', ['case', 'enclosure', 'pressure', 'корпус', 'давлен']],
-      ['anode', 'box', [-.58, 0, 0], [-1.9, 0, 0], [.36, 1.8, .62], '#f4bf4f', ['anode', 'lithium', 'анод', 'литий']],
-      ['cathode', 'box', [.58, 0, 0], [1.9, 0, 0], [.36, 1.8, .62], '#45e0b7', ['cathode', 'oxygen', 'катод', 'кислород']],
-      ['separator', 'box', [0, 0, .2], [0, 0, 1.75], [.14, 1.75, .52], '#55b9ff', ['separator', 'membrane', 'сепаратор', 'мембран']],
-      ['electrolyte', 'cylinder', [0, -.78, .62], [0, -1.7, 1.35], [.55, .28, .55], '#a58cff', ['electrolyte', 'ion', 'электролит', 'ион']],
-      ['thermal', 'torus', [0, .82, .62], [0, 1.8, 1.3], [.7, .7, .24], '#ff765f', ['heat', 'thermal', 'cool', 'тепл', 'охлаж']],
+      ['casing', 'box', [0, 0, 0], [0, 0, 0], [1.45, 1.35, .78], '#35d5d0', ['case', 'casing', 'enclosure', 'pressure', 'корпус', 'давлен']],
+      ['cells', 'cylinder', [0, 0, 0], [0, 0, 2.2], [.25, 1.1, .25], '#f4bf4f', ['cell', 'anode', 'cathode', 'lithium', 'ячейк', 'анод', 'катод', 'литий']],
+      ['separator', 'box', [0, 0, .18], [-2.05, 0, .2], [.12, 1.08, .56], '#55b9ff', ['separator', 'membrane', 'сепаратор', 'мембран']],
+      ['terminals', 'cylinder', [0, 1.48, 0], [0, 2.6, .2], [.18, .25, .18], '#45e0b7', ['terminal', 'contact', 'bus', 'клемм', 'контакт', 'шина']],
+      ['air_filter', 'box', [0, -.95, .82], [0, -2.05, 1.65], [.72, .24, .22], '#a58cff', ['air', 'filter', 'vent', 'cool', 'воздух', 'фильтр', 'вент', 'охлаж']],
+      ['control', 'box', [1.12, .82, .25], [2.3, 1.25, .65], [.34, .34, .48], '#ff765f', ['control', 'management', 'safety', 'bms', 'управлен', 'безопас', 'контрол']],
     ],
     propulsion_system: [
       ['frame', 'cylinder', [0, 0, 0], [0, 0, 0], [1.05, 2.2, 1.05], '#35d5d0', ['frame', 'structure', 'housing', 'корпус', 'каркас']],
@@ -256,6 +265,20 @@ function moduleTemplates(type: EngineeringArtifactType, ru: boolean): ModuleTemp
 
 function moduleCopy(ru: boolean): Record<string, {label: string; description: string}> {
   return ru ? {
+    body: {label: 'Несущий корпус', description: 'Силовая платформа, аэродинамическая форма и распределение нагрузки.'},
+    cabin: {label: 'Кабина', description: 'Защищённый объём экипажа, обзор и интерфейсы управления.'},
+    lift: {label: 'Подъёмная система', description: 'Крылья, роторы и поверхности, создающие и стабилизирующие подъёмную силу.'},
+    propulsion: {label: 'Тяговые модули', description: 'Двигатели и движители для горизонтальной тяги и манёвра.'},
+    torso: {label: 'Бронекорпус торса', description: 'Несущая структура, защита и распределение нагрузки на тело.'},
+    helmet: {label: 'Шлем и визор', description: 'Защита головы, обзор, связь и сенсорный интерфейс.'},
+    arms: {label: 'Модули рук', description: 'Приводы плеч, локтей и кистей с передачей усилия.'},
+    legs: {label: 'Модули ног', description: 'Опорные приводы, балансировка и передача нагрузки на поверхность.'},
+    power_core: {label: 'Энергетическое ядро', description: 'Компактный источник энергии и силовая распределительная шина.'},
+    thrusters: {label: 'Маневровые двигатели', description: 'Тяговые модули ног и стабилизация положения в полёте.'},
+    casing: {label: 'Корпус батареи', description: 'Защита ячеек, изоляция и механическое удержание пакета.'},
+    cells: {label: 'Пакет ячеек', description: 'Стек электрохимических ячеек, определяющий ёмкость и мощность.'},
+    terminals: {label: 'Силовые клеммы', description: 'Токосъём, соединительные шины и внешние силовые контакты.'},
+    air_filter: {label: 'Воздушный фильтр', description: 'Вентиляционный канал, фильтрация и отвод тепла от пакета.'},
     frame: {label: 'Несущий каркас', description: 'Геометрия, нагрузка и структурные материалы.'},
     chassis: {label: 'Корпус устройства', description: 'Базовая конструкция и интерфейсы модулей.'},
     power: {label: 'Энергетический модуль', description: 'Источник энергии, мощность и плотность хранения.'},
@@ -273,6 +296,20 @@ function moduleCopy(ru: boolean): Record<string, {label: string; description: st
     nozzle: {label: 'Выходной модуль', description: 'Формирование тяги и передача импульса.'},
     core: {label: 'Функциональное ядро', description: 'Главный механизм проверяемого эффекта.'},
   } : {
+    body: {label: 'Load-bearing body', description: 'Structural platform, aerodynamic form, and load distribution.'},
+    cabin: {label: 'Cabin', description: 'Protected crew volume, visibility, and control interfaces.'},
+    lift: {label: 'Lift system', description: 'Wings, rotors, and surfaces that create and stabilize lift.'},
+    propulsion: {label: 'Propulsion modules', description: 'Engines and propulsors for forward thrust and maneuvering.'},
+    torso: {label: 'Torso armor', description: 'Load-bearing protection and force distribution around the body.'},
+    helmet: {label: 'Helmet and visor', description: 'Head protection, vision, communications, and sensor interface.'},
+    arms: {label: 'Arm modules', description: 'Shoulder, elbow, and wrist actuators with force transfer.'},
+    legs: {label: 'Leg modules', description: 'Support actuators, balance, and load transfer to the ground.'},
+    power_core: {label: 'Power core', description: 'Compact energy source and primary power distribution bus.'},
+    thrusters: {label: 'Maneuvering thrusters', description: 'Leg propulsion modules and in-flight attitude control.'},
+    casing: {label: 'Battery casing', description: 'Cell protection, insulation, and mechanical pack retention.'},
+    cells: {label: 'Cell stack', description: 'Electrochemical cell array that determines capacity and power.'},
+    terminals: {label: 'Power terminals', description: 'Current collection, bus bars, and external power contacts.'},
+    air_filter: {label: 'Air and filter module', description: 'Ventilation path, filtration, and heat removal from the pack.'},
     frame: {label: 'Load-bearing frame', description: 'Geometry, loads, and structural materials.'},
     chassis: {label: 'Device chassis', description: 'Base structure and module interfaces.'},
     power: {label: 'Power module', description: 'Energy source, power delivery, and storage density.'},
