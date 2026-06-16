@@ -156,7 +156,7 @@
   "engineeringLab": {
     "kicker": "ENGINEERING BLUEPRINT V2",
     "title": "Engineering Model",
-    "description": "A procedural 3D engineering blueprint that maps hypothesis conditions, numerical gaps, active blockers and evidence candidates onto functional hardware modules.",
+    "description": "AI builds an engineering blueprint for any material object from its functions, modules and constraints.",
     "artifactType": "Artifact class",
     "explodedView": "Exploded view",
     "assembledView": "Assembled view",

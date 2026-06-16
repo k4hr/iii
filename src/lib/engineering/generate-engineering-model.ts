@@ -69,6 +69,7 @@ export async function generateEngineeringModel(input: EngineeringSynthesisInput)
         'Map blockers, calculations, sources, experiments and breakthrough sessions into researchOverlays attached to the closest physical module.',
         'Generate geometryPlan as the universal procedural render plan: primitives are lightweight geometric parts linked to moduleId, and connectors link primitive IDs.',
         'Do not rely on artifact-specific frontend renderers. The frontend will render geometryPlan exactly.',
+        'Infer form factor, symmetry, support structure, energy path, control loop, actuation or force path, thermal path, measurement, safety layers and material interfaces from the hypothesis. Do not treat named examples as a supported-object whitelist.',
         'Use stable lowercase ASCII IDs. Do not invent verified citations, solved breakthroughs, or real measurements.',
         `Write human-readable fields in ${isRussian(input.locale) ? 'Russian' : 'English'}.`,
       ].join(' '),
@@ -88,7 +89,7 @@ export function synthesizeEngineeringModelFallback(input: EngineeringSynthesisIn
   const ru = isRussian(input.locale);
   const corpus = normalizedCorpus(input);
   const materiality = detectMateriality(corpus);
-  const artifactClass = refineArtifactClass(detectArtifactClass(corpus, materiality), corpus);
+  const artifactClass = detectArtifactClass(corpus, materiality);
   const templates = buildPhysicalArchitecture(artifactClass, corpus, ru);
   const conditionToModule = new Map<string, string>();
 
@@ -280,11 +281,14 @@ function sensorModules(ru: boolean): ModuleTemplate[] {
 
 function genericModules(ru: boolean): ModuleTemplate[] {
   return [
-    module('body', ru ? 'Корпус системы' : 'System body', ru ? 'Физическая платформа для сборки модулей.' : 'Physical platform for assembling modules.', 'body', 'body', 'center', ['body', 'system', 'корпус']),
-    module('functional-core', ru ? 'Функциональное ядро' : 'Functional core', ru ? 'Физическая область, где должен возникать проверяемый эффект.' : 'Physical region where the testable effect should occur.', 'unknown', 'generic', 'internal', ['core', 'effect', 'ядро', 'эффект']),
-    module('energy-module', ru ? 'Энергетический модуль' : 'Energy module', ru ? 'Источник энергии или входное воздействие.' : 'Energy source or input stimulus.', 'energy', 'battery_pack', 'rear', ['energy', 'энерг']),
-    module('control-system', ru ? 'Контур управления' : 'Control system', ru ? 'Управление режимами, стабильностью и безопасностью.' : 'Control of modes, stability, and safety.', 'control', 'control_core', 'front', ['control', 'управлен']),
-    module('measurement-module', ru ? 'Измерительный модуль' : 'Measurement module', ru ? 'Наблюдение целевого сигнала и контрольных параметров.' : 'Observation of target signal and control parameters.', 'measurement', 'sensor_array', 'external', ['measure', 'измер']),
+    module('body', ru ? 'Несущая структура' : 'Load-bearing structure', ru ? 'Физическая рама или корпус, который удерживает остальные модули и передаёт нагрузки.' : 'Physical frame or housing that carries the other modules and transfers loads.', 'body', 'body', 'center', ['body', 'system', 'structure', 'frame', 'housing', 'корпус', 'рама', 'каркас', 'структур']),
+    module('functional-core', ru ? 'Функциональное ядро' : 'Functional core', ru ? 'Физическая зона, где должен возникать основной проверяемый эффект.' : 'Physical region where the main testable effect should occur.', 'material', 'generic', 'internal', ['core', 'effect', 'active', 'process', 'ядро', 'эффект', 'актив', 'процесс']),
+    module('energy-interface', ru ? 'Энергетический интерфейс' : 'Energy interface', ru ? 'Источник энергии, входное воздействие или силовой ввод для работы устройства.' : 'Energy source, input stimulus, or power interface for operating the device.', 'energy', 'battery_pack', 'rear', ['energy', 'power', 'field', 'charge', 'энерг', 'питание', 'поле', 'заряд']),
+    module('actuation-or-force-path', ru ? 'Силовой или исполнительный тракт' : 'Actuation or force path', ru ? 'Модуль, который создаёт движение, поток, силу, раскрытие или другое физическое действие.' : 'Module that creates motion, flow, force, deployment, or another physical action.', 'propulsion', 'thruster', 'external', ['force', 'motion', 'actuator', 'drive', 'flow', 'move', 'сила', 'движ', 'привод', 'поток', 'перемещ']),
+    module('control-system', ru ? 'Контур управления' : 'Control system', ru ? 'Управление режимами, обратной связью, устойчивостью и аварийным отключением.' : 'Control of modes, feedback, stability, and safe shutdown.', 'control', 'control_core', 'front', ['control', 'logic', 'feedback', 'stability', 'управлен', 'логик', 'обрат', 'стабил']),
+    module('sensor-measurement', ru ? 'Сенсоры и измерения' : 'Sensors and measurement', ru ? 'Измерение целевого эффекта, нагрузок, состояния среды и контрольных параметров.' : 'Measurement of the target effect, loads, environment state, and control parameters.', 'measurement', 'sensor_array', 'external', ['sensor', 'measure', 'detect', 'signal', 'датчик', 'измер', 'сигнал', 'детект']),
+    module('thermal-path', ru ? 'Тепловой путь' : 'Thermal path', ru ? 'Отвод, накопление или ограничение тепла, возникающего при работе системы.' : 'Heat rejection, storage, or limitation during system operation.', 'thermal', 'heat_sink', 'bottom', ['thermal', 'heat', 'cool', 'temperature', 'тепл', 'охлаж', 'температур']),
+    module('safety-envelope', ru ? 'Контур безопасности' : 'Safety envelope', ru ? 'Защитный слой, резервирование и ограничение опасных отказов.' : 'Protective layer, redundancy, and containment of hazardous failures.', 'safety', 'shield', 'external', ['safety', 'protect', 'contain', 'risk', 'безопас', 'защит', 'риск', 'отказ']),
   ];
 }
 
@@ -401,125 +405,149 @@ function buildGeometryPlan(
   const primitives: CanonicalEngineeringGeometryPrimitive[] = [];
   const add = primitiveAdder(primitives);
   const moduleByCategory = (category: EngineeringPhysicalCategory) => modules.find(module => module.category === category);
-  const moduleById = (id: string) => modules.find(module => module.id === id);
   const fallbackModule = modules[0];
+  const layout = inferGeometryLayout(artifactClass, corpus, modules);
+  if (layout === 'humanoid') addHumanoidLayout(add, modules, fallbackModule, moduleByCategory);
+  else if (layout === 'vehicle' || layout === 'winged') addVehicleLikeLayout(add, modules, fallbackModule, moduleByCategory, layout);
+  else if (layout === 'layered') addLayeredLayout(add, modules, fallbackModule, moduleByCategory);
+  else if (layout === 'radial' || layout === 'ring') addRadialLayout(add, modules, fallbackModule, moduleByCategory);
+  else addFreeformLayout(add, modules);
+  return finalizeGeometryPlan(layout, primitives, modules);
+}
 
-  if (/(motorcycle|bike|мотоцикл|байк)/i.test(corpus)) {
-    const body = moduleByCategory('body') ?? fallbackModule;
-    const lift = moduleByCategory('lift') ?? moduleByCategory('propulsion') ?? body;
-    const propulsion = moduleByCategory('propulsion') ?? lift;
-    const energy = moduleByCategory('energy') ?? body;
-    const control = moduleByCategory('control') ?? body;
-    add(body, 'frame', 'capsule', [0, 0, 0], [0, 0, Math.PI / 2], [1.7, .24, .24], 'structure');
-    add(body, 'seat', 'rounded_box', [0, .32, -.18], [0, 0, 0], [.8, .18, .36], 'body');
-    add(lift, 'front-ring-rotor', 'ring', [0, .05, -1.35], [Math.PI / 2, 0, 0], [.52, .08, .52], 'propulsion');
-    add(lift, 'rear-ring-rotor', 'ring', [0, .05, 1.35], [Math.PI / 2, 0, 0], [.52, .08, .52], 'propulsion');
-    add(propulsion, 'rear-thruster', 'cylinder', [0, -.02, 1.88], [Math.PI / 2, 0, 0], [.22, .58, .22], 'propulsion');
-    add(energy, 'energy-pack', 'rounded_box', [0, -.34, 0], [0, 0, 0], [.78, .24, .42], 'energy');
-    add(control, 'control-node', 'sphere', [0, .48, -1.02], [0, 0, 0], [.16, .16, .16], 'control');
-    return finalizeGeometryPlan('linear', primitives, modules);
+function inferGeometryLayout(
+  artifactClass: CanonicalEngineeringModel['artifactClass'],
+  corpus: string,
+  modules: CanonicalEngineeringPhysicalModule[],
+): CanonicalEngineeringGeometryPlan['layout'] {
+  const has = (pattern: RegExp) => pattern.test(corpus);
+  if (artifactClass === 'wearable' || has(/wearable|operator|body-mounted|exoskeleton|human|носим|человек|тело|экзоскелет|оператор/)) return 'humanoid';
+  if (has(/round|circular|disc|radial|annular|ring|wave|blast|impact|pressure|круг|кольц|радиаль|волна|удар|давлен|импульс/)) return 'ring';
+  if (artifactClass === 'battery' || artifactClass === 'material_system' || has(/layer|stack|cell|membrane|filter|material|composite|phase|laminate|сло|пакет|ячей|мембран|фильтр|материал|композит|фаза/)) return 'layered';
+  if (artifactClass === 'vehicle' || has(/lift|rotor|wing|flight|thrust|transport|cargo|bridge|span|движ|тяга|подъ[её]м|ротор|крыл|пол[её]т|транспорт|груз|мост|пролет/)) return has(/curved|blade|profile|лопаст|изогнут|профиль/) ? 'winged' : 'vehicle';
+  if (artifactClass === 'reactor' || artifactClass === 'propulsion' || has(/field|plasma|reactor|generator|launcher|emitter|magnetic|поле|плазм|реактор|генератор|пуск|излучател|магнит/)) return 'radial';
+  return modules.length <= 4 ? 'symmetric' : 'freeform';
+}
+
+function addHumanoidLayout(
+  add: ReturnType<typeof primitiveAdder>,
+  modules: CanonicalEngineeringPhysicalModule[],
+  fallbackModule: CanonicalEngineeringPhysicalModule,
+  moduleByCategory: (category: EngineeringPhysicalCategory) => CanonicalEngineeringPhysicalModule | undefined,
+) {
+  const body = moduleByCategory('body') ?? moduleByCategory('material') ?? fallbackModule;
+  const sensor = moduleByCategory('sensor') ?? moduleByCategory('measurement') ?? body;
+  const structure = modules.find(module => module.category === 'body' && module.id !== body.id) ?? body;
+  const energy = moduleByCategory('energy') ?? body;
+  const propulsion = moduleByCategory('propulsion') ?? moduleByCategory('lift') ?? body;
+  const safety = moduleByCategory('safety') ?? body;
+  const thermal = moduleByCategory('thermal') ?? body;
+  const control = moduleByCategory('control') ?? sensor;
+  add(body, 'central-body-carrier', 'capsule', [0, .2, 0], [0, 0, 0], [.48, .86, .28], 'structure');
+  add(sensor, 'upper-sensor-node', 'sphere', [0, 1.18, 0], [0, 0, 0], [.28, .28, .28], 'sensor');
+  add(structure, 'left-support-link', 'capsule', [-.62, .22, 0], [0, 0, .18], [.16, .68, .16], 'structure');
+  add(structure, 'right-support-link', 'capsule', [.62, .22, 0], [0, 0, -.18], [.16, .68, .16], 'structure');
+  add(structure, 'left-ground-link', 'capsule', [-.24, -.82, 0], [0, 0, 0], [.17, .78, .17], 'structure');
+  add(structure, 'right-ground-link', 'capsule', [.24, -.82, 0], [0, 0, 0], [.17, .78, .17], 'structure');
+  add(energy, 'internal-energy-core', 'sphere', [0, .26, -.28], [0, 0, 0], [.2, .2, .2], 'energy');
+  add(propulsion, 'force-actuator-pack', 'cylinder', [0, .02, .46], [Math.PI / 2, 0, 0], [.16, .5, .16], 'propulsion');
+  add(safety, 'protective-envelope', 'panel', [0, .24, -.36], [0, 0, 0], [.58, .68, .05], 'shield', .62);
+  add(thermal, 'thermal-path', 'lattice', [0, -.2, .36], [0, 0, 0], [.52, .24, .08], 'thermal');
+  add(control, 'control-reference-node', 'sphere', [0, .74, -.26], [0, 0, 0], [.12, .12, .12], 'control');
+}
+
+function addVehicleLikeLayout(
+  add: ReturnType<typeof primitiveAdder>,
+  modules: CanonicalEngineeringPhysicalModule[],
+  fallbackModule: CanonicalEngineeringPhysicalModule,
+  moduleByCategory: (category: EngineeringPhysicalCategory) => CanonicalEngineeringPhysicalModule | undefined,
+  layout: 'vehicle' | 'winged',
+) {
+  const body = moduleByCategory('body') ?? moduleByCategory('material') ?? fallbackModule;
+  const cabin = moduleByCategory('cabin') ?? moduleByCategory('sensor') ?? body;
+  const lift = moduleByCategory('lift') ?? moduleByCategory('propulsion') ?? body;
+  const propulsion = moduleByCategory('propulsion') ?? lift;
+  const energy = moduleByCategory('energy') ?? body;
+  const control = moduleByCategory('control') ?? cabin;
+  const safety = moduleByCategory('safety') ?? body;
+  const thermal = moduleByCategory('thermal') ?? body;
+  if (layout === 'winged') {
+    add(body, 'left-functional-blade', 'curved_blade', [-.62, 0, 0], [0, -.48, .22], [1.2, .1, .32], 'structure');
+    add(body, 'right-functional-blade', 'curved_blade', [.62, 0, 0], [0, .48, -.22], [1.2, .1, .32], 'structure');
+    add(body, 'central-mass', 'sphere', [0, 0, 0], [0, 0, 0], [.28, .18, .28], 'body');
+  } else {
+    add(body, 'elongated-load-body', 'rounded_box', [0, 0, 0], [0, 0, 0], [1.55, .36, .72], 'body');
+    add(cabin, 'forward-cockpit-or-sensor-bay', 'sphere', [0, .38, -.32], [0, 0, 0], [.42, .28, .36], 'glass', .62);
   }
-
-  if (/(boomerang|бумеранг)/i.test(corpus)) {
-    const body = moduleByCategory('body') ?? fallbackModule;
-    const control = moduleByCategory('control') ?? body;
-    const sensor = moduleByCategory('sensor') ?? moduleByCategory('measurement') ?? control;
-    const energy = moduleByCategory('energy') ?? body;
-    add(body, 'left-curved-blade', 'curved_blade', [-.62, 0, 0], [0, -.48, .22], [1.2, .1, .32], 'structure');
-    add(body, 'right-curved-blade', 'curved_blade', [.62, 0, 0], [0, .48, -.22], [1.2, .1, .32], 'structure');
-    add(body, 'center-mass', 'sphere', [0, 0, 0], [0, 0, 0], [.28, .18, .28], 'body');
-    add(control, 'control-node', 'sphere', [0, .22, -.42], [0, 0, 0], [.14, .14, .14], 'control');
-    add(sensor, 'sensor-node', 'sphere', [0, .2, .42], [0, 0, 0], [.12, .12, .12], 'sensor');
-    add(energy, 'micro-energy-core', 'rounded_box', [0, -.2, 0], [0, 0, 0], [.34, .12, .22], 'energy');
-    return finalizeGeometryPlan('winged', primitives, modules);
+  add(lift, 'left-force-ring', 'ring', [-1.18, .18, -.52], [Math.PI / 2, 0, 0], [.42, .06, .42], 'propulsion');
+  add(lift, 'right-force-ring', 'ring', [1.18, .18, -.52], [Math.PI / 2, 0, 0], [.42, .06, .42], 'propulsion');
+  add(propulsion, 'rear-force-channel-left', 'cylinder', [-.44, -.04, .84], [Math.PI / 2, 0, 0], [.16, .48, .16], 'propulsion');
+  add(propulsion, 'rear-force-channel-right', 'cylinder', [.44, -.04, .84], [Math.PI / 2, 0, 0], [.16, .48, .16], 'propulsion');
+  add(energy, 'internal-energy-pack', 'rounded_box', [0, -.28, .18], [0, 0, 0], [.62, .2, .38], 'energy');
+  add(control, 'control-core', 'sphere', [0, .24, -.78], [0, 0, 0], [.14, .14, .14], 'control');
+  add(safety, 'protective-front-or-envelope', 'panel', [0, .02, -.9], [0, 0, 0], [1.15, .22, .08], 'shield', .55);
+  add(thermal, 'thermal-fins', 'lattice', [0, -.38, .72], [0, 0, 0], [.8, .1, .22], 'thermal');
+  for (const module of modules.filter(module => !['body', 'cabin', 'lift', 'propulsion', 'energy', 'control', 'safety', 'thermal'].includes(module.category))) {
+    const index = modules.indexOf(module);
+    const side = index % 2 ? -1 : 1;
+    add(module, `auxiliary-${module.id}`, shapeForModule(module), [side * 1.55, .15, .2 + index * .08], [0, side * .25, 0], scaleForModule(module), roleForCategory(module.category), .72);
   }
+}
 
-  if (/(shield|щит)/i.test(corpus)) {
-    const body = moduleByCategory('body') ?? moduleByCategory('safety') ?? fallbackModule;
-    const material = moduleByCategory('material') ?? body;
-    const sensor = moduleByCategory('sensor') ?? moduleByCategory('measurement') ?? body;
-    const control = moduleByCategory('control') ?? body;
-    add(body, 'outer-ring', 'ring', [0, 0, 0], [Math.PI / 2, 0, 0], [1.35, .08, 1.35], 'shield');
-    add(material, 'front-layer', 'disc', [0, .04, 0], [Math.PI / 2, 0, 0], [1.1, .05, 1.1], 'structure', .72);
-    add(material, 'inner-layer', 'disc', [0, -.04, 0], [Math.PI / 2, 0, 0], [.82, .05, .82], 'shield', .58);
-    add(control, 'load-core', 'sphere', [0, .12, 0], [0, 0, 0], [.16, .16, .16], 'control');
-    add(sensor, 'edge-sensor-a', 'sphere', [.82, .1, 0], [0, 0, 0], [.08, .08, .08], 'sensor');
-    add(sensor, 'edge-sensor-b', 'sphere', [-.82, .1, 0], [0, 0, 0], [.08, .08, .08], 'sensor');
-    return finalizeGeometryPlan('ring', primitives, modules);
-  }
+function addLayeredLayout(
+  add: ReturnType<typeof primitiveAdder>,
+  modules: CanonicalEngineeringPhysicalModule[],
+  fallbackModule: CanonicalEngineeringPhysicalModule,
+  moduleByCategory: (category: EngineeringPhysicalCategory) => CanonicalEngineeringPhysicalModule | undefined,
+) {
+  const body = moduleByCategory('body') ?? fallbackModule;
+  const energy = moduleByCategory('energy') ?? moduleByCategory('material') ?? body;
+  const material = moduleByCategory('material') ?? energy;
+  const sensor = moduleByCategory('sensor') ?? moduleByCategory('measurement') ?? body;
+  const safety = moduleByCategory('safety') ?? body;
+  const control = moduleByCategory('control') ?? sensor;
+  const thermal = moduleByCategory('thermal') ?? body;
+  add(body, 'outer-housing', 'rounded_box', [0, 0, 0], [0, 0, 0], [1.35, .42, .7], 'body', .36);
+  add(energy, 'functional-stack', 'cell_stack', [0, 0, 0], [0, 0, 0], [.9, .34, .48], roleForCategory(energy.category));
+  add(material, 'active-material-layer-a', 'panel', [-.46, .04, 0], [0, 0, 0], [.08, .36, .52], 'structure');
+  add(material, 'active-material-layer-b', 'panel', [.46, .04, 0], [0, 0, 0], [.08, .36, .52], 'structure');
+  add(sensor, 'measurement-or-filter-interface', 'lattice', [.78, .02, 0], [0, 0, 0], [.16, .32, .5], 'sensor');
+  add(safety, 'safety-boundary-layer', 'panel', [0, -.08, 0], [0, 0, 0], [1.05, .06, .62], 'shield', .48);
+  add(control, 'control-terminal', 'cylinder', [0, .38, -.44], [Math.PI / 2, 0, 0], [.08, .48, .08], 'control');
+  add(thermal, 'thermal-loop', 'tube', [0, -.34, 0], [0, 0, Math.PI / 2], [.08, 1.08, .08], 'thermal');
+}
 
-  if (artifactClass === 'wearable') {
-    const torso = moduleById('torso') ?? moduleByCategory('body') ?? fallbackModule;
-    const helmet = moduleById('helmet') ?? moduleByCategory('sensor') ?? torso;
-    const arms = moduleById('arms') ?? torso;
-    const legs = moduleById('legs') ?? torso;
-    const power = moduleById('power-core') ?? moduleByCategory('energy') ?? torso;
-    const thrusters = moduleById('thrusters') ?? moduleByCategory('propulsion') ?? torso;
-    const armor = moduleById('armor') ?? moduleByCategory('safety') ?? torso;
-    const cooling = moduleById('cooling') ?? moduleByCategory('thermal') ?? torso;
-    const stabilization = moduleById('stabilization') ?? moduleByCategory('control') ?? torso;
-    add(torso, 'torso-shell', 'capsule', [0, .2, 0], [0, 0, 0], [.48, .86, .28], 'structure');
-    add(helmet, 'helmet', 'sphere', [0, 1.2, 0], [0, 0, 0], [.3, .3, .3], 'sensor');
-    add(arms, 'left-arm', 'capsule', [-.62, .28, 0], [0, 0, .18], [.16, .72, .16], 'structure');
-    add(arms, 'right-arm', 'capsule', [.62, .28, 0], [0, 0, -.18], [.16, .72, .16], 'structure');
-    add(legs, 'left-leg', 'capsule', [-.24, -.82, 0], [0, 0, 0], [.17, .84, .17], 'structure');
-    add(legs, 'right-leg', 'capsule', [.24, -.82, 0], [0, 0, 0], [.17, .84, .17], 'structure');
-    add(power, 'power-core', 'sphere', [0, .28, -.28], [0, 0, 0], [.2, .2, .2], 'energy');
-    add(thrusters, 'back-thrusters', 'cylinder', [0, .05, .46], [Math.PI / 2, 0, 0], [.16, .5, .16], 'propulsion');
-    add(armor, 'armor-panel', 'panel', [0, .24, -.36], [0, 0, 0], [.58, .7, .05], 'shield', .68);
-    add(cooling, 'cooling-fins', 'lattice', [0, -.22, .36], [0, 0, 0], [.52, .26, .08], 'thermal');
-    add(stabilization, 'stabilization-node', 'sphere', [0, .78, -.28], [0, 0, 0], [.12, .12, .12], 'control');
-    return finalizeGeometryPlan('humanoid', primitives, modules);
-  }
+function addRadialLayout(
+  add: ReturnType<typeof primitiveAdder>,
+  modules: CanonicalEngineeringPhysicalModule[],
+  fallbackModule: CanonicalEngineeringPhysicalModule,
+  moduleByCategory: (category: EngineeringPhysicalCategory) => CanonicalEngineeringPhysicalModule | undefined,
+) {
+  const body = moduleByCategory('body') ?? moduleByCategory('safety') ?? fallbackModule;
+  const material = moduleByCategory('material') ?? body;
+  const energy = moduleByCategory('energy') ?? body;
+  const sensor = moduleByCategory('sensor') ?? moduleByCategory('measurement') ?? body;
+  const control = moduleByCategory('control') ?? sensor;
+  const thermal = moduleByCategory('thermal') ?? body;
+  add(body, 'radial-structure-ring', 'ring', [0, 0, 0], [Math.PI / 2, 0, 0], [1.2, .08, 1.2], roleForCategory(body.category));
+  add(material, 'front-active-disc', 'disc', [0, .04, 0], [Math.PI / 2, 0, 0], [1.02, .05, 1.02], 'structure', .68);
+  add(energy, 'central-energy-or-load-node', 'sphere', [0, .12, 0], [0, 0, 0], [.17, .17, .17], 'energy');
+  add(control, 'control-reference-node', 'sphere', [0, .2, -.5], [0, 0, 0], [.12, .12, .12], 'control');
+  add(sensor, 'measurement-node-a', 'sphere', [.82, .1, 0], [0, 0, 0], [.08, .08, .08], 'sensor');
+  add(sensor, 'measurement-node-b', 'sphere', [-.82, .1, 0], [0, 0, 0], [.08, .08, .08], 'sensor');
+  add(thermal, 'radial-thermal-path', 'lattice', [0, -.12, .58], [0, 0, 0], [.7, .12, .16], 'thermal');
+}
 
-  if (artifactClass === 'battery') {
-    const casing = moduleById('casing') ?? moduleByCategory('body') ?? fallbackModule;
-    const cells = moduleById('cells') ?? moduleByCategory('energy') ?? casing;
-    const anode = moduleById('anode') ?? moduleByCategory('material') ?? cells;
-    const cathode = moduleById('air-cathode') ?? cells;
-    const filter = moduleById('air-filter') ?? moduleByCategory('sensor') ?? casing;
-    const electrolyte = moduleById('electrolyte') ?? cells;
-    const terminals = moduleById('terminals') ?? moduleByCategory('control') ?? casing;
-    const thermal = moduleById('thermal-loop') ?? moduleByCategory('thermal') ?? casing;
-    add(casing, 'casing', 'rounded_box', [0, 0, 0], [0, 0, 0], [1.35, .42, .7], 'body', .38);
-    add(cells, 'cell-stack', 'cell_stack', [0, 0, 0], [0, 0, 0], [.9, .34, .48], 'energy');
-    add(anode, 'anode-layer', 'panel', [-.46, .04, 0], [0, 0, 0], [.08, .36, .52], 'energy');
-    add(cathode, 'air-cathode-layer', 'panel', [.46, .04, 0], [0, 0, 0], [.08, .36, .52], 'energy');
-    add(filter, 'air-filter', 'lattice', [.78, .02, 0], [0, 0, 0], [.16, .32, .5], 'sensor');
-    add(electrolyte, 'electrolyte-gap', 'panel', [0, .08, 0], [0, 0, 0], [.26, .34, .5], 'body', .42);
-    add(terminals, 'terminals', 'cylinder', [0, .38, -.44], [Math.PI / 2, 0, 0], [.08, .48, .08], 'control');
-    add(thermal, 'thermal-loop', 'tube', [0, -.34, 0], [0, 0, Math.PI / 2], [.08, 1.08, .08], 'thermal');
-    return finalizeGeometryPlan('layered', primitives, modules);
-  }
-
-  if (artifactClass === 'vehicle') {
-    const body = moduleByCategory('body') ?? fallbackModule;
-    const cabin = moduleByCategory('cabin') ?? body;
-    const lift = moduleByCategory('lift') ?? body;
-    const propulsion = moduleByCategory('propulsion') ?? body;
-    const energy = moduleByCategory('energy') ?? body;
-    const control = moduleByCategory('control') ?? body;
-    const safety = moduleByCategory('safety') ?? body;
-    const thermal = moduleByCategory('thermal') ?? body;
-    add(body, 'vehicle-body', 'rounded_box', [0, 0, 0], [0, 0, 0], [1.55, .36, .72], 'body');
-    add(cabin, 'cabin', 'sphere', [0, .38, -.32], [0, 0, 0], [.42, .28, .36], 'glass', .62);
-    add(lift, 'left-rotor', 'ring', [-1.18, .18, -.52], [Math.PI / 2, 0, 0], [.42, .06, .42], 'propulsion');
-    add(lift, 'right-rotor', 'ring', [1.18, .18, -.52], [Math.PI / 2, 0, 0], [.42, .06, .42], 'propulsion');
-    add(propulsion, 'rear-thruster-left', 'cylinder', [-.44, -.04, .84], [Math.PI / 2, 0, 0], [.16, .48, .16], 'propulsion');
-    add(propulsion, 'rear-thruster-right', 'cylinder', [.44, -.04, .84], [Math.PI / 2, 0, 0], [.16, .48, .16], 'propulsion');
-    add(energy, 'energy-module', 'rounded_box', [0, -.28, .18], [0, 0, 0], [.62, .2, .38], 'energy');
-    add(control, 'control-core', 'sphere', [0, .24, -.78], [0, 0, 0], [.14, .14, .14], 'control');
-    add(safety, 'safety-shell', 'panel', [0, .02, -.9], [0, 0, 0], [1.15, .22, .08], 'shield', .55);
-    add(thermal, 'thermal-fins', 'lattice', [0, -.38, .72], [0, 0, 0], [.8, .1, .22], 'thermal');
-    return finalizeGeometryPlan('vehicle', primitives, modules);
-  }
-
+function addFreeformLayout(add: ReturnType<typeof primitiveAdder>, modules: CanonicalEngineeringPhysicalModule[]) {
+  const primary = modules.find(module => module.category === 'body') ?? modules.find(module => module.category === 'material') ?? modules[0];
+  add(primary, 'universal-load-frame', 'rounded_box', [0, 0, 0], [0, 0, 0], [1.05, .34, .62], roleForCategory(primary.category));
   for (const [index, module] of modules.entries()) {
+    if (module.id === primary.id) continue;
     const angle = index * 2.399;
     const radius = modules.length > 4 ? 1.15 : .72;
-    add(module, `module-${module.id}`, shapeForModule(module), [Math.cos(angle) * radius, index % 2 ? .18 : -.04, Math.sin(angle) * radius], [0, angle, 0], scaleForModule(module), roleForCategory(module.category));
+    const height = module.category === 'energy' ? -.3 : module.category === 'sensor' || module.category === 'measurement' ? .34 : index % 2 ? .16 : -.06;
+    add(module, `role-${module.id}`, shapeForModule(module), [Math.cos(angle) * radius, height, Math.sin(angle) * radius], [0, angle, 0], scaleForModule(module), roleForCategory(module.category), .72);
   }
-  return finalizeGeometryPlan(artifactClass === 'material_system' ? 'layered' : artifactClass === 'reactor' ? 'radial' : 'freeform', primitives, modules);
 }
 
 function primitiveAdder(primitives: CanonicalEngineeringGeometryPrimitive[]) {
@@ -677,15 +705,13 @@ function normalizedCorpus(input: EngineeringSynthesisInput): string {
 }
 
 function detectMateriality(text: string): CanonicalEngineeringModel['materiality'] {
-  if (/(motorcycle|bike|boomerang|shield|мотоцикл|байк|бумеранг|щит)/i.test(text)) return 'material';
-  const physical = /(device|machine|vehicle|material|energy|power|temperature|mass|sensor|reactor|battery|engine|костюм|машин|устройств|материал|энерг|температур|масса|датчик|реактор|батар|двигател|сверхпровод)/.test(text);
+  const physical = /(device|system|machine|vehicle|bridge|structure|generator|filter|protection|cargo|air|field|force|material|energy|power|temperature|mass|sensor|reactor|battery|engine|систем|мост|конструкц|генератор|фильтр|защит|груз|воздух|поле|сила|костюм|машин|устройств|материал|энерг|температур|масса|датчик|реактор|батар|двигател|сверхпровод)/.test(text);
   const abstract = /(algorithm|theorem|logic|consciousness|ethic|social|mathematical proof|алгоритм|теорем|логик|сознани|этик|социальн|доказательств)/.test(text);
   return physical && abstract ? 'hybrid' : physical ? 'material' : abstract ? 'abstract' : 'hybrid';
 }
 
 function detectArtifactClass(text: string, materiality: CanonicalEngineeringModel['materiality']): CanonicalEngineeringModel['artifactClass'] {
   if (materiality === 'abstract') return 'unknown';
-  if (/(motorcycle|bike|мотоцикл|байк)/i.test(text)) return 'vehicle';
   if (/(vehicle|car|drone|aircraft|автомобил|машин|дрон|транспорт|летающ)/.test(text)) return 'vehicle';
   if (/(wearable|suit|armor|exoskeleton|jetpack|костюм|брон|экзоскелет|ранец)/.test(text)) return 'wearable';
   if (/(battery|cell|lithium|аккумулятор|батар|литий)/.test(text)) return 'battery';
@@ -695,12 +721,6 @@ function detectArtifactClass(text: string, materiality: CanonicalEngineeringMode
   if (/(sensor|detector|measurement device|датчик|детектор|измерител)/.test(text)) return 'sensor';
   if (/(infrastructure|plant|network|facility|инфраструктур|станци|комплекс)/.test(text)) return 'infrastructure';
   return 'device';
-}
-
-function refineArtifactClass(artifactClass: CanonicalEngineeringModel['artifactClass'], corpus: string): CanonicalEngineeringModel['artifactClass'] {
-  if (/(motorcycle|bike|РјРѕС‚РѕС†РёРєР»|Р±Р°Р№Рє|\u043c\u043e\u0442\u043e\u0446\u0438\u043a\u043b|\u0431\u0430\u0439\u043a)/i.test(corpus)) return 'vehicle';
-  if (/(boomerang|shield|Р±СѓРјРµСЂР°РЅРі|С‰РёС‚|\u0431\u0443\u043c\u0435\u0440\u0430\u043d\u0433|\u0449\u0438\u0442)/i.test(corpus)) return 'device';
-  return artifactClass;
 }
 
 function artifactClassLabel(artifactClass: CanonicalEngineeringModel['artifactClass'], ru: boolean): string {

@@ -8,7 +8,7 @@ const summaries: string[] = [];
 for (const fixture of engineeringModelFixtures) {
   const model = synthesizeEngineeringModelFallback(fixture.input);
   if (!isRenderableEngineeringModel(model)) throw new Error(`${fixture.name}: canonical model is not renderable.`);
-  if (model.artifactClass !== fixture.expectedClass) throw new Error(`${fixture.name}: expected ${fixture.expectedClass}, received ${model.artifactClass}.`);
+  if (model.materiality !== 'material' && model.materiality !== 'hybrid') throw new Error(`${fixture.name}: expected material or hybrid materiality, received ${model.materiality}.`);
   if (model.physicalModules.length < 2) throw new Error(`${fixture.name}: expected at least two physical modules.`);
   if (!model.interfaces.length) throw new Error(`${fixture.name}: expected at least one physical interface.`);
   if (!model.researchOverlays.length) throw new Error(`${fixture.name}: expected research overlays.`);
@@ -17,9 +17,12 @@ for (const fixture of engineeringModelFixtures) {
 
   const forbidden = model.physicalModules.some(module => /механизм|услови|blocker|constraint|огранич/i.test(module.name));
   if (forbidden) throw new Error(`${fixture.name}: research blocker leaked into physical modules.`);
+  const meaningfulModules = model.physicalModules.filter(module => module.name.trim().length > 4 && module.role.trim().length > 16);
+  if (meaningfulModules.length < Math.min(4, model.physicalModules.length)) throw new Error(`${fixture.name}: physical modules are too generic.`);
 
   const allBoxes = model.geometryPlan.primitives.every(primitive => primitive.shape === 'box' || primitive.shape === 'rounded_box');
   if (allBoxes) throw new Error(`${fixture.name}: geometryPlan uses only box primitives.`);
+  if (model.geometryPlan.primitives.length === 1 && model.geometryPlan.primitives[0]?.shape === 'box') throw new Error(`${fixture.name}: model fell back to a blank cube.`);
 
   const primitiveModuleIds = new Set(model.geometryPlan.primitives.map(primitive => primitive.moduleId));
   const missingPrimitiveModules = model.physicalModules.filter(module => !primitiveModuleIds.has(module.id));
