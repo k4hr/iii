@@ -58,11 +58,11 @@ export function buildEngineeringRenderModules(model: CanonicalEngineeringModel):
   return physicalModules.slice(0, 18).map((module, index) => {
     const primitiveCenter = modulePrimitiveCenter(model, module.id);
     const position = primitiveCenter ?? fallbackModulePosition(module, index, hintCounts);
-    const outward = normalize(position[0], position[1], position[2]);
+    const outward = explodeDirection(module, position);
     const explodedPosition: Vector3Tuple = [
-      position[0] + outward[0] * 1.15,
-      position[1] + outward[1] * 1.15,
-      position[2] + outward[2] * 1.15,
+      position[0] + outward[0] * 1.2,
+      position[1] + outward[1] * 1.2,
+      position[2] + outward[2] * 1.2,
     ];
     const overlays = model.researchOverlays.filter(overlay => overlay.linkedModuleId === module.id);
 
@@ -105,7 +105,7 @@ export function buildEngineeringRenderPrimitives(model: CanonicalEngineeringMode
     .filter(primitive => moduleMap.has(primitive.moduleId))
     .map(primitive => {
       const module = moduleMap.get(primitive.moduleId)!;
-      const outward = normalize(primitive.position[0], primitive.position[1], primitive.position[2]);
+      const outward = explodeDirection(module, primitive.position);
       return {
         ...primitive,
         color: engineeringMaterialRoleColor(primitive.materialRole),
@@ -117,6 +117,20 @@ export function buildEngineeringRenderPrimitives(model: CanonicalEngineeringMode
         ],
       };
     });
+}
+
+function explodeDirection(module: CanonicalEngineeringPhysicalModule, position: Vector3Tuple): Vector3Tuple {
+  if (module.category === 'body') return [0, .28, 0];
+  if (module.category === 'cabin' || module.positionHint === 'top') return [0, 1, -.18];
+  if (module.category === 'energy' || module.positionHint === 'internal') return [0, -.9, .25];
+  if (module.category === 'thermal' || module.positionHint === 'bottom') return [0, -1, .35];
+  if (module.category === 'propulsion' || module.positionHint === 'rear') return normalize(position[0] * .35, .05, Math.abs(position[2]) + 1);
+  if (module.category === 'lift') return normalize(position[0] || (module.positionHint === 'left' ? -1 : 1), .25, position[2] * .3);
+  if (module.positionHint === 'left') return [-1, .15, 0];
+  if (module.positionHint === 'right') return [1, .15, 0];
+  if (module.positionHint === 'front') return [0, .1, -1];
+  if (module.positionHint === 'external' || module.category === 'safety') return normalize(position[0], .65, position[2] || 1);
+  return normalize(position[0], position[1], position[2]);
 }
 
 function moduleSeverity(module: CanonicalEngineeringPhysicalModule, overlays: CanonicalEngineeringResearchOverlay[]): EngineeringSeverity {
