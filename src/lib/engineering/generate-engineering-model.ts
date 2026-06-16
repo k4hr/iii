@@ -5,12 +5,16 @@ import {getOpenAIClient} from '@/lib/ai/openai-client';
 import {
   engineeringModelSchema,
   type CanonicalEngineeringModel,
+  type CanonicalEngineeringGeometryPlan,
+  type CanonicalEngineeringGeometryPrimitive,
   type CanonicalEngineeringPhysicalModule,
   type CanonicalEngineeringResearchOverlay,
   type EngineeringPhysicalCategory,
   type EngineeringPhysicalGeometryHint,
+  type EngineeringGeometryMaterialRole,
   type EngineeringPositionHint,
   type EngineeringSeverity,
+  type Vector3Tuple,
 } from '@/lib/engineering/engineering-model-schema';
 
 export type EngineeringSynthesisInput = {
@@ -63,6 +67,8 @@ export async function generateEngineeringModel(input: EngineeringSynthesisInput)
         'The 3D model must be based on physicalModules only: hardware parts, material layers, housings, power systems, controls, safety systems and measurement hardware.',
         'Do not turn research blockers, assumptions or condition titles into physicalModules unless no physical artifact can be inferred.',
         'Map blockers, calculations, sources, experiments and breakthrough sessions into researchOverlays attached to the closest physical module.',
+        'Generate geometryPlan as the universal procedural render plan: primitives are lightweight geometric parts linked to moduleId, and connectors link primitive IDs.',
+        'Do not rely on artifact-specific frontend renderers. The frontend will render geometryPlan exactly.',
         'Use stable lowercase ASCII IDs. Do not invent verified citations, solved breakthroughs, or real measurements.',
         `Write human-readable fields in ${isRussian(input.locale) ? 'Russian' : 'English'}.`,
       ].join(' '),
@@ -82,7 +88,7 @@ export function synthesizeEngineeringModelFallback(input: EngineeringSynthesisIn
   const ru = isRussian(input.locale);
   const corpus = normalizedCorpus(input);
   const materiality = detectMateriality(corpus);
-  const artifactClass = detectArtifactClass(corpus, materiality);
+  const artifactClass = refineArtifactClass(detectArtifactClass(corpus, materiality), corpus);
   const templates = buildPhysicalArchitecture(artifactClass, corpus, ru);
   const conditionToModule = new Map<string, string>();
 
@@ -102,6 +108,7 @@ export function synthesizeEngineeringModelFallback(input: EngineeringSynthesisIn
   });
 
   const researchOverlays = buildResearchOverlays(input, templates, conditionToModule);
+  const geometryPlan = buildGeometryPlan(artifactClass, corpus, physicalModules);
   const progress = normalizePercent(input.analysis?.researchProgress);
   const functionality = normalizePercent(input.analysis?.functionalityProgress);
   const testability = normalizePercent(input.analysis?.testabilityProgress);
@@ -120,6 +127,7 @@ export function synthesizeEngineeringModelFallback(input: EngineeringSynthesisIn
     engineeringIntent: input.analysis?.formalizedClaim?.trim() || input.hypothesis.text.trim(),
     physicalModules,
     researchOverlays,
+    geometryPlan,
     interfaces: buildInterfaces(physicalModules),
     metrics: [
       metric('research', ru ? 'Исследование' : 'Research', progress),
@@ -154,11 +162,13 @@ export function enrichEngineeringModelContext(model: CanonicalEngineeringModel, 
   const missingModules = fallback.physicalModules.filter(module => !existingModuleIds.has(module.id) && !physicalModules.some(item => item.category === module.category));
   const moduleIds = new Set([...physicalModules, ...missingModules].map(module => module.id));
   const researchOverlays = uniqueOverlays([...model.researchOverlays, ...fallback.researchOverlays]).filter(overlay => moduleIds.has(overlay.linkedModuleId));
+  const geometryPlan = mergeGeometryPlans(model.geometryPlan, fallback.geometryPlan, moduleIds);
   return engineeringModelSchema.parse({
     ...model,
     artifactLabel: model.artifactLabel || fallback.artifactLabel,
     physicalModules: [...physicalModules, ...missingModules],
     researchOverlays,
+    geometryPlan,
     interfaces: buildInterfaces([...physicalModules, ...missingModules]),
     charts: fallback.charts,
   });
@@ -171,6 +181,7 @@ function normalizeModel(model: CanonicalEngineeringModel, input: EngineeringSynt
     artifactLabel: model.artifactLabel || artifactClassLabel(model.artifactClass, isRussian(input.locale)),
     physicalModules: model.physicalModules.length ? model.physicalModules : fallback.physicalModules,
     researchOverlays: model.researchOverlays,
+    geometryPlan: model.geometryPlan?.primitives?.length ? model.geometryPlan : fallback.geometryPlan,
   });
   return enrichEngineeringModelContext(safeModel, input);
 }
@@ -382,6 +393,272 @@ function buildInterfaces(modules: CanonicalEngineeringPhysicalModule[]): Canonic
   return uniqueInterfaces(interfaces).filter(link => byId.has(link.fromModuleId) && byId.has(link.toModuleId));
 }
 
+function buildGeometryPlan(
+  artifactClass: CanonicalEngineeringModel['artifactClass'],
+  corpus: string,
+  modules: CanonicalEngineeringPhysicalModule[],
+): CanonicalEngineeringGeometryPlan {
+  const primitives: CanonicalEngineeringGeometryPrimitive[] = [];
+  const add = primitiveAdder(primitives);
+  const moduleByCategory = (category: EngineeringPhysicalCategory) => modules.find(module => module.category === category);
+  const moduleById = (id: string) => modules.find(module => module.id === id);
+  const fallbackModule = modules[0];
+
+  if (/(motorcycle|bike|мотоцикл|байк)/i.test(corpus)) {
+    const body = moduleByCategory('body') ?? fallbackModule;
+    const lift = moduleByCategory('lift') ?? moduleByCategory('propulsion') ?? body;
+    const propulsion = moduleByCategory('propulsion') ?? lift;
+    const energy = moduleByCategory('energy') ?? body;
+    const control = moduleByCategory('control') ?? body;
+    add(body, 'frame', 'capsule', [0, 0, 0], [0, 0, Math.PI / 2], [1.7, .24, .24], 'structure');
+    add(body, 'seat', 'rounded_box', [0, .32, -.18], [0, 0, 0], [.8, .18, .36], 'body');
+    add(lift, 'front-ring-rotor', 'ring', [0, .05, -1.35], [Math.PI / 2, 0, 0], [.52, .08, .52], 'propulsion');
+    add(lift, 'rear-ring-rotor', 'ring', [0, .05, 1.35], [Math.PI / 2, 0, 0], [.52, .08, .52], 'propulsion');
+    add(propulsion, 'rear-thruster', 'cylinder', [0, -.02, 1.88], [Math.PI / 2, 0, 0], [.22, .58, .22], 'propulsion');
+    add(energy, 'energy-pack', 'rounded_box', [0, -.34, 0], [0, 0, 0], [.78, .24, .42], 'energy');
+    add(control, 'control-node', 'sphere', [0, .48, -1.02], [0, 0, 0], [.16, .16, .16], 'control');
+    return finalizeGeometryPlan('linear', primitives, modules);
+  }
+
+  if (/(boomerang|бумеранг)/i.test(corpus)) {
+    const body = moduleByCategory('body') ?? fallbackModule;
+    const control = moduleByCategory('control') ?? body;
+    const sensor = moduleByCategory('sensor') ?? moduleByCategory('measurement') ?? control;
+    const energy = moduleByCategory('energy') ?? body;
+    add(body, 'left-curved-blade', 'curved_blade', [-.62, 0, 0], [0, -.48, .22], [1.2, .1, .32], 'structure');
+    add(body, 'right-curved-blade', 'curved_blade', [.62, 0, 0], [0, .48, -.22], [1.2, .1, .32], 'structure');
+    add(body, 'center-mass', 'sphere', [0, 0, 0], [0, 0, 0], [.28, .18, .28], 'body');
+    add(control, 'control-node', 'sphere', [0, .22, -.42], [0, 0, 0], [.14, .14, .14], 'control');
+    add(sensor, 'sensor-node', 'sphere', [0, .2, .42], [0, 0, 0], [.12, .12, .12], 'sensor');
+    add(energy, 'micro-energy-core', 'rounded_box', [0, -.2, 0], [0, 0, 0], [.34, .12, .22], 'energy');
+    return finalizeGeometryPlan('winged', primitives, modules);
+  }
+
+  if (/(shield|щит)/i.test(corpus)) {
+    const body = moduleByCategory('body') ?? moduleByCategory('safety') ?? fallbackModule;
+    const material = moduleByCategory('material') ?? body;
+    const sensor = moduleByCategory('sensor') ?? moduleByCategory('measurement') ?? body;
+    const control = moduleByCategory('control') ?? body;
+    add(body, 'outer-ring', 'ring', [0, 0, 0], [Math.PI / 2, 0, 0], [1.35, .08, 1.35], 'shield');
+    add(material, 'front-layer', 'disc', [0, .04, 0], [Math.PI / 2, 0, 0], [1.1, .05, 1.1], 'structure', .72);
+    add(material, 'inner-layer', 'disc', [0, -.04, 0], [Math.PI / 2, 0, 0], [.82, .05, .82], 'shield', .58);
+    add(control, 'load-core', 'sphere', [0, .12, 0], [0, 0, 0], [.16, .16, .16], 'control');
+    add(sensor, 'edge-sensor-a', 'sphere', [.82, .1, 0], [0, 0, 0], [.08, .08, .08], 'sensor');
+    add(sensor, 'edge-sensor-b', 'sphere', [-.82, .1, 0], [0, 0, 0], [.08, .08, .08], 'sensor');
+    return finalizeGeometryPlan('ring', primitives, modules);
+  }
+
+  if (artifactClass === 'wearable') {
+    const torso = moduleById('torso') ?? moduleByCategory('body') ?? fallbackModule;
+    const helmet = moduleById('helmet') ?? moduleByCategory('sensor') ?? torso;
+    const arms = moduleById('arms') ?? torso;
+    const legs = moduleById('legs') ?? torso;
+    const power = moduleById('power-core') ?? moduleByCategory('energy') ?? torso;
+    const thrusters = moduleById('thrusters') ?? moduleByCategory('propulsion') ?? torso;
+    const armor = moduleById('armor') ?? moduleByCategory('safety') ?? torso;
+    const cooling = moduleById('cooling') ?? moduleByCategory('thermal') ?? torso;
+    const stabilization = moduleById('stabilization') ?? moduleByCategory('control') ?? torso;
+    add(torso, 'torso-shell', 'capsule', [0, .2, 0], [0, 0, 0], [.48, .86, .28], 'structure');
+    add(helmet, 'helmet', 'sphere', [0, 1.2, 0], [0, 0, 0], [.3, .3, .3], 'sensor');
+    add(arms, 'left-arm', 'capsule', [-.62, .28, 0], [0, 0, .18], [.16, .72, .16], 'structure');
+    add(arms, 'right-arm', 'capsule', [.62, .28, 0], [0, 0, -.18], [.16, .72, .16], 'structure');
+    add(legs, 'left-leg', 'capsule', [-.24, -.82, 0], [0, 0, 0], [.17, .84, .17], 'structure');
+    add(legs, 'right-leg', 'capsule', [.24, -.82, 0], [0, 0, 0], [.17, .84, .17], 'structure');
+    add(power, 'power-core', 'sphere', [0, .28, -.28], [0, 0, 0], [.2, .2, .2], 'energy');
+    add(thrusters, 'back-thrusters', 'cylinder', [0, .05, .46], [Math.PI / 2, 0, 0], [.16, .5, .16], 'propulsion');
+    add(armor, 'armor-panel', 'panel', [0, .24, -.36], [0, 0, 0], [.58, .7, .05], 'shield', .68);
+    add(cooling, 'cooling-fins', 'lattice', [0, -.22, .36], [0, 0, 0], [.52, .26, .08], 'thermal');
+    add(stabilization, 'stabilization-node', 'sphere', [0, .78, -.28], [0, 0, 0], [.12, .12, .12], 'control');
+    return finalizeGeometryPlan('humanoid', primitives, modules);
+  }
+
+  if (artifactClass === 'battery') {
+    const casing = moduleById('casing') ?? moduleByCategory('body') ?? fallbackModule;
+    const cells = moduleById('cells') ?? moduleByCategory('energy') ?? casing;
+    const anode = moduleById('anode') ?? moduleByCategory('material') ?? cells;
+    const cathode = moduleById('air-cathode') ?? cells;
+    const filter = moduleById('air-filter') ?? moduleByCategory('sensor') ?? casing;
+    const electrolyte = moduleById('electrolyte') ?? cells;
+    const terminals = moduleById('terminals') ?? moduleByCategory('control') ?? casing;
+    const thermal = moduleById('thermal-loop') ?? moduleByCategory('thermal') ?? casing;
+    add(casing, 'casing', 'rounded_box', [0, 0, 0], [0, 0, 0], [1.35, .42, .7], 'body', .38);
+    add(cells, 'cell-stack', 'cell_stack', [0, 0, 0], [0, 0, 0], [.9, .34, .48], 'energy');
+    add(anode, 'anode-layer', 'panel', [-.46, .04, 0], [0, 0, 0], [.08, .36, .52], 'energy');
+    add(cathode, 'air-cathode-layer', 'panel', [.46, .04, 0], [0, 0, 0], [.08, .36, .52], 'energy');
+    add(filter, 'air-filter', 'lattice', [.78, .02, 0], [0, 0, 0], [.16, .32, .5], 'sensor');
+    add(electrolyte, 'electrolyte-gap', 'panel', [0, .08, 0], [0, 0, 0], [.26, .34, .5], 'body', .42);
+    add(terminals, 'terminals', 'cylinder', [0, .38, -.44], [Math.PI / 2, 0, 0], [.08, .48, .08], 'control');
+    add(thermal, 'thermal-loop', 'tube', [0, -.34, 0], [0, 0, Math.PI / 2], [.08, 1.08, .08], 'thermal');
+    return finalizeGeometryPlan('layered', primitives, modules);
+  }
+
+  if (artifactClass === 'vehicle') {
+    const body = moduleByCategory('body') ?? fallbackModule;
+    const cabin = moduleByCategory('cabin') ?? body;
+    const lift = moduleByCategory('lift') ?? body;
+    const propulsion = moduleByCategory('propulsion') ?? body;
+    const energy = moduleByCategory('energy') ?? body;
+    const control = moduleByCategory('control') ?? body;
+    const safety = moduleByCategory('safety') ?? body;
+    const thermal = moduleByCategory('thermal') ?? body;
+    add(body, 'vehicle-body', 'rounded_box', [0, 0, 0], [0, 0, 0], [1.55, .36, .72], 'body');
+    add(cabin, 'cabin', 'sphere', [0, .38, -.32], [0, 0, 0], [.42, .28, .36], 'glass', .62);
+    add(lift, 'left-rotor', 'ring', [-1.18, .18, -.52], [Math.PI / 2, 0, 0], [.42, .06, .42], 'propulsion');
+    add(lift, 'right-rotor', 'ring', [1.18, .18, -.52], [Math.PI / 2, 0, 0], [.42, .06, .42], 'propulsion');
+    add(propulsion, 'rear-thruster-left', 'cylinder', [-.44, -.04, .84], [Math.PI / 2, 0, 0], [.16, .48, .16], 'propulsion');
+    add(propulsion, 'rear-thruster-right', 'cylinder', [.44, -.04, .84], [Math.PI / 2, 0, 0], [.16, .48, .16], 'propulsion');
+    add(energy, 'energy-module', 'rounded_box', [0, -.28, .18], [0, 0, 0], [.62, .2, .38], 'energy');
+    add(control, 'control-core', 'sphere', [0, .24, -.78], [0, 0, 0], [.14, .14, .14], 'control');
+    add(safety, 'safety-shell', 'panel', [0, .02, -.9], [0, 0, 0], [1.15, .22, .08], 'shield', .55);
+    add(thermal, 'thermal-fins', 'lattice', [0, -.38, .72], [0, 0, 0], [.8, .1, .22], 'thermal');
+    return finalizeGeometryPlan('vehicle', primitives, modules);
+  }
+
+  for (const [index, module] of modules.entries()) {
+    const angle = index * 2.399;
+    const radius = modules.length > 4 ? 1.15 : .72;
+    add(module, `module-${module.id}`, shapeForModule(module), [Math.cos(angle) * radius, index % 2 ? .18 : -.04, Math.sin(angle) * radius], [0, angle, 0], scaleForModule(module), roleForCategory(module.category));
+  }
+  return finalizeGeometryPlan(artifactClass === 'material_system' ? 'layered' : artifactClass === 'reactor' ? 'radial' : 'freeform', primitives, modules);
+}
+
+function primitiveAdder(primitives: CanonicalEngineeringGeometryPrimitive[]) {
+  return (
+    module: CanonicalEngineeringPhysicalModule,
+    id: string,
+    shape: CanonicalEngineeringGeometryPrimitive['shape'],
+    position: Vector3Tuple,
+    rotation: Vector3Tuple,
+    scale: Vector3Tuple,
+    materialRole: EngineeringGeometryMaterialRole,
+    opacity?: number,
+  ) => {
+    primitives.push({id: uniquePrimitiveId(primitives, id), moduleId: module.id, shape, position, rotation, scale, materialRole, ...(opacity === undefined ? {} : {opacity})});
+  };
+}
+
+function finalizeGeometryPlan(layout: CanonicalEngineeringGeometryPlan['layout'], primitives: CanonicalEngineeringGeometryPrimitive[], modules: CanonicalEngineeringPhysicalModule[]): CanonicalEngineeringGeometryPlan {
+  const completed = ensureModulePrimitives(primitives, modules);
+  const primary = completed[0];
+  return {
+    layout,
+    primitives: completed,
+    connectors: completed.slice(1).map(primitive => ({
+      fromPrimitiveId: primary.id,
+      toPrimitiveId: primitive.id,
+      type: connectorType(primary.materialRole, primitive.materialRole),
+    })),
+  };
+}
+
+function ensureModulePrimitives(primitives: CanonicalEngineeringGeometryPrimitive[], modules: CanonicalEngineeringPhysicalModule[]): CanonicalEngineeringGeometryPrimitive[] {
+  const completed = [...primitives];
+  const moduleIds = new Set(completed.map(primitive => primitive.moduleId));
+  for (const [index, module] of modules.entries()) {
+    if (moduleIds.has(module.id)) continue;
+    const angle = index * 2.399;
+    const radius = 1.65;
+    completed.push({
+      id: uniquePrimitiveId(completed, `fallback-${module.id}`),
+      moduleId: module.id,
+      shape: shapeForModule(module),
+      position: [Math.cos(angle) * radius, index % 2 ? .24 : -.18, Math.sin(angle) * radius],
+      rotation: [0, angle, 0],
+      scale: scaleForModule(module),
+      materialRole: roleForCategory(module.category),
+      opacity: .68,
+    });
+  }
+  return completed;
+}
+
+function mergeGeometryPlans(
+  modelPlan: CanonicalEngineeringGeometryPlan,
+  fallbackPlan: CanonicalEngineeringGeometryPlan,
+  moduleIds: Set<string>,
+): CanonicalEngineeringGeometryPlan {
+  const existingModules = new Set(modelPlan.primitives.map(primitive => primitive.moduleId));
+  const primitives = [
+    ...modelPlan.primitives.filter(primitive => moduleIds.has(primitive.moduleId)),
+    ...fallbackPlan.primitives.filter(primitive => moduleIds.has(primitive.moduleId) && !existingModules.has(primitive.moduleId)),
+  ];
+  const primitiveIds = new Set(primitives.map(primitive => primitive.id));
+  return {
+    layout: modelPlan.layout || fallbackPlan.layout,
+    primitives,
+    connectors: [
+      ...modelPlan.connectors,
+      ...fallbackPlan.connectors,
+    ].filter(connector => primitiveIds.has(connector.fromPrimitiveId) && primitiveIds.has(connector.toPrimitiveId)),
+  };
+}
+
+function uniquePrimitiveId(primitives: CanonicalEngineeringGeometryPrimitive[], id: string): string {
+  const safe = id.replace(/[^a-z0-9_-]/gi, '-').toLowerCase();
+  if (!primitives.some(primitive => primitive.id === safe)) return safe;
+  let index = 2;
+  while (primitives.some(primitive => primitive.id === `${safe}-${index}`)) index += 1;
+  return `${safe}-${index}`;
+}
+
+function shapeForModule(module: CanonicalEngineeringPhysicalModule): CanonicalEngineeringGeometryPrimitive['shape'] {
+  const map: Record<EngineeringPhysicalGeometryHint, CanonicalEngineeringGeometryPrimitive['shape']> = {
+    body: 'rounded_box',
+    cabin: 'sphere',
+    wing: 'wing',
+    rotor: 'ring',
+    thruster: 'cylinder',
+    battery_pack: 'cell_stack',
+    control_core: 'sphere',
+    heat_sink: 'lattice',
+    sensor_array: 'sphere',
+    shield: 'disc',
+    frame: 'lattice',
+    cell_stack: 'cell_stack',
+    generic: 'rounded_box',
+  };
+  return map[module.geometryHint];
+}
+
+function scaleForModule(module: CanonicalEngineeringPhysicalModule): Vector3Tuple {
+  const map: Record<EngineeringPhysicalGeometryHint, Vector3Tuple> = {
+    body: [1, .38, .58],
+    cabin: [.38, .28, .34],
+    wing: [1.3, .07, .28],
+    rotor: [.48, .06, .48],
+    thruster: [.18, .5, .18],
+    battery_pack: [.62, .22, .36],
+    control_core: [.16, .16, .16],
+    heat_sink: [.55, .12, .24],
+    sensor_array: [.16, .16, .16],
+    shield: [.8, .08, .8],
+    frame: [.9, .16, .5],
+    cell_stack: [.58, .34, .42],
+    generic: [.48, .36, .42],
+  };
+  return map[module.geometryHint];
+}
+
+function roleForCategory(category: EngineeringPhysicalCategory): EngineeringGeometryMaterialRole {
+  if (category === 'energy') return 'energy';
+  if (category === 'thermal') return 'thermal';
+  if (category === 'control') return 'control';
+  if (category === 'propulsion' || category === 'lift') return 'propulsion';
+  if (category === 'sensor' || category === 'measurement') return 'sensor';
+  if (category === 'safety') return 'shield';
+  if (category === 'body' || category === 'cabin') return 'body';
+  if (category === 'material') return 'structure';
+  return 'unknown';
+}
+
+function connectorType(from: EngineeringGeometryMaterialRole, to: EngineeringGeometryMaterialRole): CanonicalEngineeringGeometryPlan['connectors'][number]['type'] {
+  if (from === 'energy' || to === 'energy') return 'energy';
+  if (from === 'control' || to === 'control' || from === 'sensor' || to === 'sensor') return 'signal';
+  if (from === 'thermal' || to === 'thermal') return 'heat';
+  if (from === 'propulsion' || to === 'propulsion') return 'force';
+  return 'structural';
+}
+
 function compactInput(input: EngineeringSynthesisInput) {
   return {
     locale: isRussian(input.locale) ? 'ru' : 'en',
@@ -400,6 +677,7 @@ function normalizedCorpus(input: EngineeringSynthesisInput): string {
 }
 
 function detectMateriality(text: string): CanonicalEngineeringModel['materiality'] {
+  if (/(motorcycle|bike|boomerang|shield|мотоцикл|байк|бумеранг|щит)/i.test(text)) return 'material';
   const physical = /(device|machine|vehicle|material|energy|power|temperature|mass|sensor|reactor|battery|engine|костюм|машин|устройств|материал|энерг|температур|масса|датчик|реактор|батар|двигател|сверхпровод)/.test(text);
   const abstract = /(algorithm|theorem|logic|consciousness|ethic|social|mathematical proof|алгоритм|теорем|логик|сознани|этик|социальн|доказательств)/.test(text);
   return physical && abstract ? 'hybrid' : physical ? 'material' : abstract ? 'abstract' : 'hybrid';
@@ -407,6 +685,7 @@ function detectMateriality(text: string): CanonicalEngineeringModel['materiality
 
 function detectArtifactClass(text: string, materiality: CanonicalEngineeringModel['materiality']): CanonicalEngineeringModel['artifactClass'] {
   if (materiality === 'abstract') return 'unknown';
+  if (/(motorcycle|bike|мотоцикл|байк)/i.test(text)) return 'vehicle';
   if (/(vehicle|car|drone|aircraft|автомобил|машин|дрон|транспорт|летающ)/.test(text)) return 'vehicle';
   if (/(wearable|suit|armor|exoskeleton|jetpack|костюм|брон|экзоскелет|ранец)/.test(text)) return 'wearable';
   if (/(battery|cell|lithium|аккумулятор|батар|литий)/.test(text)) return 'battery';
@@ -416,6 +695,12 @@ function detectArtifactClass(text: string, materiality: CanonicalEngineeringMode
   if (/(sensor|detector|measurement device|датчик|детектор|измерител)/.test(text)) return 'sensor';
   if (/(infrastructure|plant|network|facility|инфраструктур|станци|комплекс)/.test(text)) return 'infrastructure';
   return 'device';
+}
+
+function refineArtifactClass(artifactClass: CanonicalEngineeringModel['artifactClass'], corpus: string): CanonicalEngineeringModel['artifactClass'] {
+  if (/(motorcycle|bike|РјРѕС‚РѕС†РёРєР»|Р±Р°Р№Рє|\u043c\u043e\u0442\u043e\u0446\u0438\u043a\u043b|\u0431\u0430\u0439\u043a)/i.test(corpus)) return 'vehicle';
+  if (/(boomerang|shield|Р±СѓРјРµСЂР°РЅРі|С‰РёС‚|\u0431\u0443\u043c\u0435\u0440\u0430\u043d\u0433|\u0449\u0438\u0442)/i.test(corpus)) return 'device';
+  return artifactClass;
 }
 
 function artifactClassLabel(artifactClass: CanonicalEngineeringModel['artifactClass'], ru: boolean): string {

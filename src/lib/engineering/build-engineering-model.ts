@@ -2,12 +2,13 @@ import type {
   CanonicalEngineeringModel,
   CanonicalEngineeringPhysicalModule,
   CanonicalEngineeringResearchOverlay,
+  CanonicalEngineeringGeometryPrimitive,
   EngineeringPhysicalCategory,
   EngineeringPhysicalGeometryHint,
+  EngineeringGeometryMaterialRole,
   EngineeringSeverity,
+  Vector3Tuple,
 } from '@/lib/engineering/engineering-model-schema';
-
-export type Vector3Tuple = [number, number, number];
 
 export type EngineeringRenderModule = CanonicalEngineeringPhysicalModule & {
   color: string;
@@ -16,6 +17,12 @@ export type EngineeringRenderModule = CanonicalEngineeringPhysicalModule & {
   explodedPosition: Vector3Tuple;
   scale: Vector3Tuple;
   overlays: CanonicalEngineeringResearchOverlay[];
+};
+
+export type EngineeringRenderPrimitive = CanonicalEngineeringGeometryPrimitive & {
+  color: string;
+  module: EngineeringRenderModule;
+  explodedPosition: Vector3Tuple;
 };
 
 const CATEGORY_COLORS: Record<EngineeringPhysicalCategory, string> = {
@@ -49,21 +56,13 @@ export function buildEngineeringRenderModules(model: CanonicalEngineeringModel):
   const hintCounts = new Map<string, number>();
   const physicalModules = model.physicalModules.length ? model.physicalModules : [];
   return physicalModules.slice(0, 18).map((module, index) => {
-    const occurrence = hintCounts.get(module.positionHint) ?? 0;
-    hintCounts.set(module.positionHint, occurrence + 1);
-    const base = POSITION_BASE[module.positionHint];
-    const orbit = occurrence * .48;
-    const angle = index * 2.399;
-    const position: Vector3Tuple = [
-      base[0] + Math.cos(angle) * orbit,
-      base[1] + (occurrence % 2 ? .22 : -.12) * occurrence,
-      base[2] + Math.sin(angle) * orbit,
-    ];
+    const primitiveCenter = modulePrimitiveCenter(model, module.id);
+    const position = primitiveCenter ?? fallbackModulePosition(module, index, hintCounts);
     const outward = normalize(position[0], position[1], position[2]);
     const explodedPosition: Vector3Tuple = [
-      position[0] + outward[0] * (1.15 + occurrence * .18),
-      position[1] + outward[1] * (1.15 + occurrence * .18),
-      position[2] + outward[2] * (1.15 + occurrence * .18),
+      position[0] + outward[0] * 1.15,
+      position[1] + outward[1] * 1.15,
+      position[2] + outward[2] * 1.15,
     ];
     const overlays = model.researchOverlays.filter(overlay => overlay.linkedModuleId === module.id);
 
@@ -81,6 +80,43 @@ export function buildEngineeringRenderModules(model: CanonicalEngineeringModel):
 
 export function engineeringCategoryColor(category: EngineeringPhysicalCategory): string {
   return CATEGORY_COLORS[category];
+}
+
+export function engineeringMaterialRoleColor(role: EngineeringGeometryMaterialRole): string {
+  const colors: Record<EngineeringGeometryMaterialRole, string> = {
+    body: '#35d5d0',
+    glass: '#7dd3fc',
+    energy: '#f4bf4f',
+    thermal: '#fb923c',
+    control: '#a58cff',
+    propulsion: '#ff765f',
+    sensor: '#67e8f9',
+    shield: '#fb7185',
+    structure: '#9dd66f',
+    unknown: '#94a3b8',
+  };
+  return colors[role];
+}
+
+export function buildEngineeringRenderPrimitives(model: CanonicalEngineeringModel): EngineeringRenderPrimitive[] {
+  const modules = buildEngineeringRenderModules(model);
+  const moduleMap = new Map(modules.map(module => [module.id, module]));
+  return model.geometryPlan.primitives
+    .filter(primitive => moduleMap.has(primitive.moduleId))
+    .map(primitive => {
+      const module = moduleMap.get(primitive.moduleId)!;
+      const outward = normalize(primitive.position[0], primitive.position[1], primitive.position[2]);
+      return {
+        ...primitive,
+        color: engineeringMaterialRoleColor(primitive.materialRole),
+        module,
+        explodedPosition: [
+          primitive.position[0] + outward[0] * 1.15,
+          primitive.position[1] + outward[1] * 1.15,
+          primitive.position[2] + outward[2] * 1.15,
+        ],
+      };
+    });
 }
 
 function moduleSeverity(module: CanonicalEngineeringPhysicalModule, overlays: CanonicalEngineeringResearchOverlay[]): EngineeringSeverity {
@@ -107,6 +143,29 @@ function geometryScale(hint: EngineeringPhysicalGeometryHint): Vector3Tuple {
     generic: [.72, .72, .72],
   };
   return scales[hint];
+}
+
+function modulePrimitiveCenter(model: CanonicalEngineeringModel, moduleId: string): Vector3Tuple | null {
+  const primitives = model.geometryPlan.primitives.filter(primitive => primitive.moduleId === moduleId);
+  if (!primitives.length) return null;
+  return [
+    primitives.reduce((sum, primitive) => sum + primitive.position[0], 0) / primitives.length,
+    primitives.reduce((sum, primitive) => sum + primitive.position[1], 0) / primitives.length,
+    primitives.reduce((sum, primitive) => sum + primitive.position[2], 0) / primitives.length,
+  ];
+}
+
+function fallbackModulePosition(module: CanonicalEngineeringPhysicalModule, index: number, hintCounts: Map<string, number>): Vector3Tuple {
+  const occurrence = hintCounts.get(module.positionHint) ?? 0;
+  hintCounts.set(module.positionHint, occurrence + 1);
+  const base = POSITION_BASE[module.positionHint];
+  const orbit = occurrence * .48;
+  const angle = index * 2.399;
+  return [
+    base[0] + Math.cos(angle) * orbit,
+    base[1] + (occurrence % 2 ? .22 : -.12) * occurrence,
+    base[2] + Math.sin(angle) * orbit,
+  ];
 }
 
 function normalize(x: number, y: number, z: number): Vector3Tuple {
