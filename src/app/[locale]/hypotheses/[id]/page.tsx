@@ -24,7 +24,7 @@ import {parseEngineeringModel} from '@/lib/engineering/engineering-model-schema'
 import {enrichEngineeringModelContext, synthesizeEngineeringModelFallback} from '@/lib/engineering/generate-engineering-model';
 import {runCalculationAction, runParameterCalculationAction} from '@/server/actions/calculations';
 import {discoverSourcesAction} from '@/server/actions/sources';
-import {regenerateEngineeringModelAction} from '@/server/actions/hypotheses';
+import {regenerateEngineeringModelAction, resetEngineeringModelAction, updateEngineeringModelAction} from '@/server/actions/hypotheses';
 import {getCurrentUser} from '@/lib/auth/current-user';
 import {notFound, redirect} from 'next/navigation';
 
@@ -252,6 +252,56 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
       research: engineeringT('metrics.research'), functionality: engineeringT('metrics.functionality'), testability: engineeringT('metrics.testability'),
       confidence: engineeringT('metrics.confidence'), evidence: engineeringT('metrics.evidence'),
     },
+    editor: {
+      viewMode: engineeringT('editor.viewMode'), editMode: engineeringT('editor.editMode'), warning: engineeringT('editor.warning'),
+      save: engineeringT('editor.save'), saving: engineeringT('editor.saving'), cancel: engineeringT('editor.cancel'),
+      addModule: engineeringT('editor.addModule'), newModuleName: engineeringT('editor.newModuleName'), newModuleRole: engineeringT('editor.newModuleRole'), newOverlayTitle: engineeringT('editor.newOverlayTitle'),
+      deleteModule: engineeringT('editor.deleteModule'), deleteModuleDisabled: engineeringT('editor.deleteModuleDisabled'),
+      moduleName: engineeringT('editor.moduleName'), moduleRole: engineeringT('editor.moduleRole'), moduleDescription: engineeringT('editor.moduleDescription'),
+      category: engineeringT('editor.category'), geometryHint: engineeringT('editor.geometryHint'), positionHint: engineeringT('editor.positionHint'),
+      feasibility: engineeringT('editor.feasibility'), reset: engineeringT('editor.reset'), resetConfirm: engineeringT('editor.resetConfirm'),
+      geometryPrimitives: engineeringT('editor.geometryPrimitives'), addPrimitive: engineeringT('editor.addPrimitive'), deletePrimitive: engineeringT('editor.deletePrimitive'),
+      shape: engineeringT('editor.shape'), position: engineeringT('editor.position'), rotation: engineeringT('editor.rotation'), scale: engineeringT('editor.scale'),
+      materialRole: engineeringT('editor.materialRole'), opacity: engineeringT('editor.opacity'),
+      researchOverlays: engineeringT('editor.researchOverlays'), addOverlay: engineeringT('editor.addOverlay'), deleteOverlay: engineeringT('editor.deleteOverlay'),
+      overlayTitle: engineeringT('editor.overlayTitle'), overlayType: engineeringT('editor.overlayType'), severityLabel: engineeringT('editor.severityLabel'), gapOrders: engineeringT('gapOrders'),
+      severity: {
+        info: engineeringT('severity.info'), success: engineeringT('severity.success'), warning: engineeringT('severity.warning'), critical: engineeringT('severity.critical'),
+      },
+      categoryLabels: {
+        body: engineeringT('editor.categories.body'), cabin: engineeringT('editor.categories.cabin'), lift: engineeringT('editor.categories.lift'),
+        propulsion: engineeringT('editor.categories.propulsion'), energy: engineeringT('editor.categories.energy'), control: engineeringT('editor.categories.control'),
+        thermal: engineeringT('editor.categories.thermal'), safety: engineeringT('editor.categories.safety'), sensor: engineeringT('editor.categories.sensor'),
+        material: engineeringT('editor.categories.material'), measurement: engineeringT('editor.categories.measurement'), unknown: engineeringT('editor.categories.unknown'),
+      },
+      geometryHintLabels: {
+        body: engineeringT('editor.geometryHints.body'), cabin: engineeringT('editor.geometryHints.cabin'), wing: engineeringT('editor.geometryHints.wing'),
+        rotor: engineeringT('editor.geometryHints.rotor'), thruster: engineeringT('editor.geometryHints.thruster'), battery_pack: engineeringT('editor.geometryHints.battery_pack'),
+        control_core: engineeringT('editor.geometryHints.control_core'), heat_sink: engineeringT('editor.geometryHints.heat_sink'), sensor_array: engineeringT('editor.geometryHints.sensor_array'),
+        shield: engineeringT('editor.geometryHints.shield'), frame: engineeringT('editor.geometryHints.frame'), cell_stack: engineeringT('editor.geometryHints.cell_stack'), generic: engineeringT('editor.geometryHints.generic'),
+      },
+      positionHintLabels: {
+        center: engineeringT('editor.positions.center'), front: engineeringT('editor.positions.front'), rear: engineeringT('editor.positions.rear'),
+        left: engineeringT('editor.positions.left'), right: engineeringT('editor.positions.right'), top: engineeringT('editor.positions.top'),
+        bottom: engineeringT('editor.positions.bottom'), internal: engineeringT('editor.positions.internal'), external: engineeringT('editor.positions.external'),
+      },
+      shapeLabels: {
+        box: engineeringT('editor.shapes.box'), rounded_box: engineeringT('editor.shapes.rounded_box'), sphere: engineeringT('editor.shapes.sphere'),
+        cylinder: engineeringT('editor.shapes.cylinder'), cone: engineeringT('editor.shapes.cone'), torus: engineeringT('editor.shapes.torus'),
+        disc: engineeringT('editor.shapes.disc'), ring: engineeringT('editor.shapes.ring'), wing: engineeringT('editor.shapes.wing'),
+        curved_blade: engineeringT('editor.shapes.curved_blade'), panel: engineeringT('editor.shapes.panel'), capsule: engineeringT('editor.shapes.capsule'),
+        tube: engineeringT('editor.shapes.tube'), lattice: engineeringT('editor.shapes.lattice'), cell_stack: engineeringT('editor.shapes.cell_stack'),
+      },
+      materialRoleLabels: {
+        body: engineeringT('editor.materialRoles.body'), glass: engineeringT('editor.materialRoles.glass'), energy: engineeringT('editor.materialRoles.energy'),
+        thermal: engineeringT('editor.materialRoles.thermal'), control: engineeringT('editor.materialRoles.control'), propulsion: engineeringT('editor.materialRoles.propulsion'),
+        sensor: engineeringT('editor.materialRoles.sensor'), shield: engineeringT('editor.materialRoles.shield'), structure: engineeringT('editor.materialRoles.structure'), unknown: engineeringT('editor.materialRoles.unknown'),
+      },
+      overlayTypeLabels: {
+        blocker: engineeringT('editor.overlayTypes.blocker'), calculation: engineeringT('editor.overlayTypes.calculation'), source: engineeringT('editor.overlayTypes.source'),
+        experiment: engineeringT('editor.overlayTypes.experiment'), breakthrough: engineeringT('editor.overlayTypes.breakthrough'),
+      },
+    },
   };
   const labLogLabels = {
     title: labT('title'),
@@ -391,6 +441,10 @@ export default async function HypothesisPage({params}: {params: Promise<{locale:
           </form>
         </div>
         <EngineeringVisualLab
+          actions={{
+            update: updateEngineeringModelAction.bind(null, locale, hypothesis.id),
+            reset: resetEngineeringModelAction.bind(null, locale, hypothesis.id),
+          }}
           labels={engineeringLabels}
           model={engineeringModel}
           records={{

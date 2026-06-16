@@ -206,6 +206,67 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .section-kicker::before { content: ""; width: 1.65rem; height: 1px; background: linear-gradient(90deg, transparent, #4cf0df); box-shadow: 0 0 8px #4cf0df; }
 .section-heading { font-size: clamp(1.65rem, 3vw, 2.65rem); font-weight: 650; letter-spacing: -.035em; color: #efffff; }
 .mono-label { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .62rem; letter-spacing: .12em; text-transform: uppercase; color: #588083; }
+
+.editor-button {
+  border: 1px solid rgba(167, 243, 252, .12);
+  border-radius: .65rem;
+  background: rgba(0, 0, 0, .3);
+  padding: .55rem .7rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .56rem;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: rgba(207, 250, 254, .66);
+  transition: border-color .18s ease, color .18s ease, background .18s ease;
+}
+
+.editor-button:hover:not(:disabled) {
+  border-color: rgba(167, 243, 252, .34);
+  background: rgba(34, 211, 238, .06);
+  color: rgba(236, 254, 255, .92);
+}
+
+.editor-button:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
+.editor-field {
+  display: grid;
+  gap: .4rem;
+  font-size: .62rem;
+  line-height: 1rem;
+  color: rgba(207, 250, 254, .55);
+}
+
+.editor-field > span {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .52rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: rgba(165, 243, 252, .36);
+}
+
+.editor-field input,
+.editor-field textarea,
+.editor-field select,
+.editor-input {
+  width: 100%;
+  border: 1px solid rgba(167, 243, 252, .1);
+  border-radius: .65rem;
+  background: rgba(0, 0, 0, .36);
+  padding: .55rem .65rem;
+  color: rgba(236, 254, 255, .82);
+  outline: none;
+}
+
+.editor-field input:focus,
+.editor-field textarea:focus,
+.editor-field select:focus,
+.editor-input:focus {
+  border-color: rgba(34, 211, 238, .42);
+  box-shadow: 0 0 0 1px rgba(34, 211, 238, .12), 0 0 22px rgba(34, 211, 238, .08);
+}
 .data-grid { background-image: linear-gradient(rgba(83, 222, 210, .035) 1px, transparent 1px), linear-gradient(90deg, rgba(83, 222, 210, .035) 1px, transparent 1px); background-size: 28px 28px; }
 .critical-card { border: 1px solid rgba(255, 95, 107, .22); border-radius: 1rem; background: linear-gradient(135deg, rgba(75, 18, 25, .18), rgba(12, 9, 12, .5)); box-shadow: inset 3px 0 0 rgba(255, 100, 111, .55), 0 0 30px rgba(164, 32, 45, .05); }
 .terminal-text { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }

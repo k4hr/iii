@@ -7,6 +7,14 @@ import {prisma} from '@/lib/db/prisma';
 import {createHypothesisRecord} from '@/lib/hypotheses/create-hypothesis-record';
 import {getOpenAIClient} from '@/lib/ai/openai-client';
 import {generateEngineeringModel} from '@/lib/engineering/generate-engineering-model';
+import {
+  engineeringModelSchema,
+  engineeringPhysicalModuleSchema,
+  parseEngineeringModel,
+  type CanonicalEngineeringGeometryPrimitive,
+  type CanonicalEngineeringModel,
+  type CanonicalEngineeringPhysicalModule,
+} from '@/lib/engineering/engineering-model-schema';
 import {getConditionImportanceLabel} from '@/lib/locale/enum-labels';
 import {routeLocaleToPrisma} from '@/lib/locale/locale';
 import {localizeMockValue} from '@/lib/locale/mock-copy';
@@ -213,6 +221,210 @@ export async function regenerateEngineeringModelAction(locale: string, hypothesi
 
   revalidatePath(`/${routeLocale}/hypotheses/${hypothesis.id}`);
   if (latestSession) revalidatePath(`/${routeLocale}/breakthroughs/${latestSession.id}`);
+}
+
+export async function updateEngineeringModelAction(locale: string, hypothesisId: string, patch: unknown) {
+  const user = await requireCurrentUser();
+  const routeLocale = locale === 'ru' ? 'ru' : 'en';
+  const parsed = engineeringModelSchema.safeParse(patch);
+  if (!parsed.success) throw new Error('Invalid engineering model patch.');
+  const context = await loadEngineeringEditContext(user.id, hypothesisId, parsed.data);
+  validateEngineeringModelIntegrity(parsed.data);
+  assertProtectedModulesPreserved(context.previousModel, parsed.data);
+  await persistEngineeringModelUpdate({locale: routeLocale, ...context, model: parsed.data});
+}
+
+export async function addEngineeringModuleAction(locale: string, hypothesisId: string, module: unknown) {
+  const user = await requireCurrentUser();
+  const routeLocale = locale === 'ru' ? 'ru' : 'en';
+  const context = await loadEngineeringEditContext(user.id, hypothesisId);
+  const parsed = engineeringPhysicalModuleSchema.safeParse(module);
+  if (!parsed.success) throw new Error('Invalid engineering module.');
+  const newModule = ensureUserModuleId(parsed.data);
+  if (context.currentModel.physicalModules.some(item => item.id === newModule.id)) throw new Error('Engineering module already exists.');
+  const primitive = defaultPrimitiveForModule(newModule, context.currentModel.geometryPlan.primitives);
+  const model: CanonicalEngineeringModel = {
+    ...context.currentModel,
+    physicalModules: [...context.currentModel.physicalModules, newModule],
+    geometryPlan: {
+      ...context.currentModel.geometryPlan,
+      primitives: [...context.currentModel.geometryPlan.primitives, primitive],
+      connectors: context.currentModel.geometryPlan.primitives[0]
+        ? [...context.currentModel.geometryPlan.connectors, {fromPrimitiveId: context.currentModel.geometryPlan.primitives[0].id, toPrimitiveId: primitive.id, type: 'structural'}]
+        : context.currentModel.geometryPlan.connectors,
+    },
+  };
+  validateEngineeringModelIntegrity(model);
+  await persistEngineeringModelUpdate({locale: routeLocale, ...context, model});
+}
+
+export async function deleteEngineeringModuleAction(locale: string, hypothesisId: string, moduleId: string) {
+  const user = await requireCurrentUser();
+  const routeLocale = locale === 'ru' ? 'ru' : 'en';
+  const context = await loadEngineeringEditContext(user.id, hypothesisId);
+  if (!moduleId.startsWith('user-')) throw new Error('Only user-added modules can be deleted.');
+  if (!context.currentModel.physicalModules.some(module => module.id === moduleId)) return;
+  const removedPrimitiveIds = new Set(context.currentModel.geometryPlan.primitives.filter(primitive => primitive.moduleId === moduleId).map(primitive => primitive.id));
+  const model: CanonicalEngineeringModel = {
+    ...context.currentModel,
+    physicalModules: context.currentModel.physicalModules.filter(module => module.id !== moduleId),
+    interfaces: context.currentModel.interfaces.filter(link => link.fromModuleId !== moduleId && link.toModuleId !== moduleId),
+    researchOverlays: context.currentModel.researchOverlays.filter(overlay => overlay.linkedModuleId !== moduleId),
+    geometryPlan: {
+      ...context.currentModel.geometryPlan,
+      primitives: context.currentModel.geometryPlan.primitives.filter(primitive => primitive.moduleId !== moduleId),
+      connectors: context.currentModel.geometryPlan.connectors.filter(connector => !removedPrimitiveIds.has(connector.fromPrimitiveId) && !removedPrimitiveIds.has(connector.toPrimitiveId)),
+    },
+  };
+  validateEngineeringModelIntegrity(model);
+  await persistEngineeringModelUpdate({locale: routeLocale, ...context, model});
+}
+
+export async function resetEngineeringModelAction(locale: string, hypothesisId: string) {
+  await regenerateEngineeringModelAction(locale, hypothesisId);
+}
+
+type EngineeringEditContext = {
+  hypothesis: LoadedEngineeringHypothesis;
+  analysisId: string;
+  analysisScale: Scale;
+  visualSceneId?: string;
+  latestSessionId?: string;
+  currentModel: CanonicalEngineeringModel;
+  previousModel: CanonicalEngineeringModel | null;
+};
+
+type LoadedEngineeringHypothesis = NonNullable<Awaited<ReturnType<typeof loadEngineeringHypothesis>>>;
+
+async function loadEngineeringEditContext(userId: string, hypothesisId: string, fallbackModel?: CanonicalEngineeringModel): Promise<EngineeringEditContext> {
+  const hypothesis = await loadEngineeringHypothesis(userId, hypothesisId);
+  const analysis = hypothesis?.analyses[0];
+  const scene = hypothesis?.visualScenes[0];
+  const previousModel = parseEngineeringModel(scene?.engineeringModelJson);
+  const currentModel = previousModel ?? fallbackModel ?? null;
+  if (!hypothesis || !analysis || !currentModel) throw new Error('Engineering model not found in the current workspace.');
+  return {
+    hypothesis,
+    analysisId: analysis.id,
+    analysisScale: analysis.scale || Scale.UNKNOWN,
+    visualSceneId: scene?.id,
+    latestSessionId: hypothesis.breakthroughSessions[0]?.id,
+    currentModel,
+    previousModel,
+  };
+}
+
+async function loadEngineeringHypothesis(userId: string, hypothesisId: string) {
+  return prisma.hypothesis.findFirst({
+    where: {id: hypothesisId, ownerId: userId},
+    include: {
+      analyses: {orderBy: {createdAt: 'desc'}, take: 1},
+      visualScenes: {take: 1, orderBy: {createdAt: 'desc'}},
+      breakthroughSessions: {where: {ownerId: userId}, orderBy: {updatedAt: 'desc'}, take: 1},
+    },
+  });
+}
+
+async function persistEngineeringModelUpdate(input: EngineeringEditContext & {locale: 'en' | 'ru'; model: CanonicalEngineeringModel}) {
+  const message = input.locale === 'ru' ? 'Инженерная модель изменена' : 'Engineering model updated';
+  const scene = await prisma.$transaction(async tx => {
+    const savedScene = input.visualSceneId
+      ? await tx.visualScene.update({
+          where: {id: input.visualSceneId},
+          data: {engineeringModelJson: toPrismaJson(input.model)},
+          select: {id: true},
+        })
+      : await tx.visualScene.create({
+          data: {
+            hypothesisId: input.hypothesis.id,
+            analysisId: input.analysisId,
+            sceneType: 'generic_model',
+            scale: input.analysisScale,
+            objectsJson: [],
+            variablesJson: [],
+            constraintsJson: [],
+            measurementsJson: [],
+            engineeringModelJson: toPrismaJson(input.model),
+          },
+          select: {id: true},
+        });
+
+    const latestVersion = await tx.hypothesisVersion.aggregate({
+      where: {hypothesisId: input.hypothesis.id},
+      _max: {versionNumber: true},
+    });
+    await tx.hypothesisVersion.create({
+      data: {
+        hypothesisId: input.hypothesis.id,
+        versionNumber: (latestVersion._max.versionNumber ?? 0) + 1,
+        title: input.hypothesis.originalTitle,
+        text: input.hypothesis.originalText,
+        canonicalTextEn: input.hypothesis.canonicalTextEn,
+        changeSummary: 'ENGINEERING_MODEL_UPDATED',
+      },
+    });
+
+    if (input.latestSessionId) {
+      await tx.breakthroughEvent.create({
+        data: {
+          sessionId: input.latestSessionId,
+          type: 'AI_REASONING_STEP',
+          content: toPrismaJsonObject({
+            eventKey: 'ENGINEERING_MODEL_UPDATED',
+            message,
+            hypothesisId: input.hypothesis.id,
+            visualSceneId: savedScene.id,
+            physicalModules: input.model.physicalModules.length,
+            primitives: input.model.geometryPlan.primitives.length,
+            previousEngineeringModelJson: input.previousModel,
+          }),
+        },
+      });
+    }
+    return savedScene;
+  });
+
+  revalidatePath(`/${input.locale}/hypotheses/${input.hypothesis.id}`);
+  if (input.latestSessionId) revalidatePath(`/${input.locale}/breakthroughs/${input.latestSessionId}`);
+  return scene;
+}
+
+function validateEngineeringModelIntegrity(model: CanonicalEngineeringModel) {
+  const moduleIds = new Set(model.physicalModules.map(module => module.id));
+  const primitiveIds = new Set(model.geometryPlan.primitives.map(primitive => primitive.id));
+  const duplicatePrimitiveIds = model.geometryPlan.primitives.length !== primitiveIds.size;
+  if (duplicatePrimitiveIds || model.physicalModules.length !== moduleIds.size) throw new Error('Engineering model contains duplicate ids.');
+  for (const primitive of model.geometryPlan.primitives) if (!moduleIds.has(primitive.moduleId)) throw new Error('Geometry primitive is linked to an unknown module.');
+  for (const overlay of model.researchOverlays) if (!moduleIds.has(overlay.linkedModuleId)) throw new Error('Research overlay is linked to an unknown module.');
+  for (const link of model.interfaces) if (!moduleIds.has(link.fromModuleId) || !moduleIds.has(link.toModuleId)) throw new Error('Engineering interface is linked to an unknown module.');
+  for (const connector of model.geometryPlan.connectors) if (!primitiveIds.has(connector.fromPrimitiveId) || !primitiveIds.has(connector.toPrimitiveId)) throw new Error('Geometry connector is linked to an unknown primitive.');
+}
+
+function assertProtectedModulesPreserved(previousModel: CanonicalEngineeringModel | null, nextModel: CanonicalEngineeringModel) {
+  if (!previousModel) return;
+  const nextIds = new Set(nextModel.physicalModules.map(module => module.id));
+  for (const module of previousModel.physicalModules) {
+    if (!module.id.startsWith('user-') && !nextIds.has(module.id)) throw new Error('AI-generated modules cannot be deleted from the editor.');
+  }
+}
+
+function ensureUserModuleId(module: CanonicalEngineeringPhysicalModule): CanonicalEngineeringPhysicalModule {
+  const id = module.id.startsWith('user-') ? module.id : `user-${module.id.replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 70)}`;
+  return {...module, id};
+}
+
+function defaultPrimitiveForModule(module: CanonicalEngineeringPhysicalModule, primitives: CanonicalEngineeringGeometryPrimitive[]): CanonicalEngineeringGeometryPrimitive {
+  const base = primitives.find(primitive => primitive.moduleId === module.id)?.position ?? [0, 0, 0] as [number, number, number];
+  return {
+    id: `user-primitive-${module.id}`,
+    moduleId: module.id,
+    shape: module.category === 'energy' ? 'cell_stack' : module.category === 'propulsion' || module.category === 'lift' ? 'cylinder' : module.category === 'sensor' || module.category === 'measurement' ? 'sphere' : 'rounded_box',
+    position: [Math.max(-20, Math.min(20, base[0] + 0.35)), base[1], base[2]],
+    rotation: [0, 0, 0],
+    scale: [.55, .34, .45],
+    materialRole: module.category === 'energy' ? 'energy' : module.category === 'propulsion' || module.category === 'lift' ? 'propulsion' : module.category === 'control' ? 'control' : module.category === 'thermal' ? 'thermal' : module.category === 'sensor' || module.category === 'measurement' ? 'sensor' : module.category === 'safety' ? 'shield' : 'structure',
+    opacity: .78,
+  };
 }
 
 function jsonRecord(value: unknown): Record<string, unknown> {

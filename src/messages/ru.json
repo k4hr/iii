@@ -67,7 +67,11 @@
     "recentCalculations": "Последние расчёты",
     "labLog": "Журнал лаборатории"
   },
-  "projects": {"title": "Исследовательские проекты", "newTitle": "Название нового проекта", "empty": "Проектов пока нет."},
+  "projects": {
+    "title": "Исследовательские проекты",
+    "newTitle": "Название нового проекта",
+    "empty": "Проектов пока нет."
+  },
   "hypothesis": {
     "createTitle": "Создать гипотезу",
     "noProject": "Без проекта",
@@ -86,7 +90,17 @@
     "technicalModelHelp": "Внутренняя структурная модель для симулятора. Это не финальный научный вывод.",
     "target": "Целевой объект",
     "confidence": "уверенность модели",
-    "tabs": {"overview": "Обзор", "model": "Модель", "breakthrough": "Карта прорыва", "visual": "Визуальная лаборатория", "engineering": "Инженерная модель", "experiments": "Эксперименты", "simulations": "Симуляции", "sources": "Источники", "versions": "Версии"},
+    "tabs": {
+      "overview": "Обзор",
+      "model": "Модель",
+      "breakthrough": "Карта прорыва",
+      "visual": "Визуальная лаборатория",
+      "engineering": "Инженерная модель",
+      "experiments": "Эксперименты",
+      "simulations": "Симуляции",
+      "sources": "Источники",
+      "versions": "Версии"
+    },
     "conditions": "Необходимые условия",
     "ifSolved": "Что изменится при решении",
     "known": "Что известно",
@@ -120,7 +134,13 @@
     "addNote": "Добавить заметку",
     "notePlaceholder": "Добавить исследовательскую заметку"
   },
-  "visual": {"objects": "Объекты", "fields": "Силы и поля", "variables": "Переменные", "constraints": "Ограничения", "measurements": "Измерения"},
+  "visual": {
+    "objects": "Объекты",
+    "fields": "Силы и поля",
+    "variables": "Переменные",
+    "constraints": "Ограничения",
+    "measurements": "Измерения"
+  },
   "visualLab": {
     "kicker": "ДИНАМИЧЕСКАЯ МОДЕЛЬ СИСТЕМЫ",
     "title": "Визуальная лаборатория",
@@ -130,8 +150,24 @@
     "open": "Открыть связанный раздел",
     "more": "и ещё {count}",
     "selected": "Выбранный узел",
-    "nodeTypes": {"hypothesis": "Гипотеза", "condition": "Условие", "blocker": "Критический блокер", "calculation": "Расчёт", "source": "Источник-кандидат", "breakthrough": "Активный прорыв"},
-    "legend": {"title": "Легенда", "hypothesis": "Гипотеза", "condition": "Условие", "blocker": "Критический блокер", "calculation": "Расчёт", "source": "Источник-кандидат", "connection": "Связь", "progress": "Прогресс"}
+    "nodeTypes": {
+      "hypothesis": "Гипотеза",
+      "condition": "Условие",
+      "blocker": "Критический блокер",
+      "calculation": "Расчёт",
+      "source": "Источник-кандидат",
+      "breakthrough": "Активный прорыв"
+    },
+    "legend": {
+      "title": "Легенда",
+      "hypothesis": "Гипотеза",
+      "condition": "Условие",
+      "blocker": "Критический блокер",
+      "calculation": "Расчёт",
+      "source": "Источник-кандидат",
+      "connection": "Связь",
+      "progress": "Прогресс"
+    }
   },
   "engineeringLab": {
     "kicker": "ИНЖЕНЕРНАЯ СХЕМА V2",
@@ -158,10 +194,142 @@
     "abstractNotice": "Гипотеза преимущественно абстрактна. Пока не определён измеримый физический носитель, 3D-сцена показывает структурную модель зависимостей.",
     "engineeringIntent": "Инженерный замысел",
     "nextEngineeringStep": "Следующий инженерный шаг",
-    "severity": {"info": "На проверке", "success": "Готово", "warning": "Инженерный разрыв", "critical": "Критический блокер"},
-    "metrics": {"research": "Исследование", "functionality": "Работоспособность", "testability": "Проверяемость", "confidence": "Уверенность", "evidence": "Доказательная база"}
+    "severity": {
+      "info": "На проверке",
+      "success": "Готово",
+      "warning": "Инженерный разрыв",
+      "critical": "Критический блокер"
+    },
+    "metrics": {
+      "research": "Исследование",
+      "functionality": "Работоспособность",
+      "testability": "Проверяемость",
+      "confidence": "Уверенность",
+      "evidence": "Доказательная база"
+    },
+    "editor": {
+      "viewMode": "????????",
+      "editMode": "??????????????",
+      "warning": "?????? ????????? ??????????? ?????? AI-??????.",
+      "save": "????????? ??????",
+      "saving": "??????????...",
+      "cancel": "??????",
+      "addModule": "???????? ??????",
+      "deleteModule": "??????? ??????",
+      "deleteModuleDisabled": "??????? ????? ?????? ??????, ??????????? ?????????????.",
+      "moduleName": "???????? ??????",
+      "moduleRole": "????",
+      "moduleDescription": "????????",
+      "category": "?????????",
+      "geometryHint": "?????????",
+      "positionHint": "?????????",
+      "feasibility": "?????? ?????????????",
+      "reset": "???????? ? AI-??????",
+      "resetConfirm": "??????????? ?????????? ?????? ????? AI-??????? ?????? ????????? ????? ????????????.",
+      "geometryPrimitives": "?????????????? ?????????",
+      "addPrimitive": "???????? ????????",
+      "deletePrimitive": "??????? ????????",
+      "shape": "?????",
+      "position": "???????",
+      "rotation": "???????",
+      "scale": "???????",
+      "materialRole": "???????????? ????",
+      "opacity": "????????????",
+      "researchOverlays": "????????????????? ????",
+      "addOverlay": "???????? ????",
+      "deleteOverlay": "??????? ????",
+      "overlayTitle": "???????? ????",
+      "overlayType": "??? ????",
+      "severityLabel": "????????",
+      "categories": {
+        "body": "??????",
+        "cabin": "??????",
+        "lift": "????????? ???????",
+        "propulsion": "????",
+        "energy": "???????",
+        "control": "??????????",
+        "thermal": "???????? ??????",
+        "safety": "????????????",
+        "sensor": "??????",
+        "material": "????????",
+        "measurement": "?????????",
+        "unknown": "??????????"
+      },
+      "geometryHints": {
+        "body": "??????",
+        "cabin": "??????",
+        "wing": "?????",
+        "rotor": "?????",
+        "thruster": "?????",
+        "battery_pack": "?????????? ????",
+        "control_core": "?????? ??????????",
+        "heat_sink": "??????????",
+        "sensor_array": "????????? ??????",
+        "shield": "??????",
+        "frame": "????",
+        "cell_stack": "???? ?????",
+        "generic": "????????????? ?????"
+      },
+      "positions": {
+        "center": "?????",
+        "front": "???????",
+        "rear": "?????",
+        "left": "?????",
+        "right": "??????",
+        "top": "??????",
+        "bottom": "?????",
+        "internal": "??????",
+        "external": "???????"
+      },
+      "shapes": {
+        "box": "????",
+        "rounded_box": "??????????? ????",
+        "sphere": "?????",
+        "cylinder": "???????",
+        "cone": "?????",
+        "torus": "???",
+        "disc": "????",
+        "ring": "??????",
+        "wing": "?????",
+        "curved_blade": "????????? ???????",
+        "panel": "??????",
+        "capsule": "???????",
+        "tube": "?????",
+        "lattice": "???????",
+        "cell_stack": "???? ?????"
+      },
+      "materialRoles": {
+        "body": "??????",
+        "glass": "??????",
+        "energy": "???????",
+        "thermal": "?????",
+        "control": "??????????",
+        "propulsion": "????",
+        "sensor": "??????",
+        "shield": "??????",
+        "structure": "?????????",
+        "unknown": "??????????"
+      },
+      "overlayTypes": {
+        "blocker": "??????",
+        "calculation": "??????",
+        "source": "????????",
+        "experiment": "???????????",
+        "breakthrough": "??????"
+      },
+      "newModuleName": "????? ??????",
+      "newModuleRole": "?????????? ??????, ??????????? ?????????????.",
+      "newOverlayTitle": "????????????????? ????"
+    }
   },
-  "experiments": {"title": "Эксперименты", "equipment": "Необходимое оборудование", "signal": "Ожидаемый сигнал", "falsification": "Критерий опровержения", "safety": "Безопасность", "difficulty": "Сложность"},
+  "experiments": {
+    "title": "Эксперименты",
+    "equipment": "Необходимое оборудование",
+    "signal": "Ожидаемый сигнал",
+    "falsification": "Критерий опровержения",
+    "safety": "Безопасность",
+    "difficulty": "Сложность"
+  },
   "calculations": {
     "title": "Расчёты",
     "description": "Детерминированные грубые оценки главного физического или инженерного разрыва.",
@@ -205,7 +373,12 @@
       "notes": "Заметки к сценарию",
       "notesPlaceholder": "Допущения, ограничения или изменения в этом сценарии...",
       "run": "Пересчитать параметры",
-      "effects": {"low": "Низкий / следовый эффект", "medium": "Средний эффект", "high": "Высокий эффект", "extreme": "Экстремальный эффект"}
+      "effects": {
+        "low": "Низкий / следовый эффект",
+        "medium": "Средний эффект",
+        "high": "Высокий эффект",
+        "extreme": "Экстремальный эффект"
+      }
     }
   },
   "sources": {
@@ -258,11 +431,44 @@
     "ideaReviewDescription": "Предложение прошло структурированную диагностическую проверку.",
     "experimentDescription": "Предложен протокол проверяемого эксперимента.",
     "simulationDescription": "Для гипотезы создан сценарий симуляции.",
-    "metadata": {"count": "Количество", "condition": "Условие", "status": "Статус", "relationship": "Связь", "gap": "Разрыв", "energyGap": "Энергетический разрыв", "scaleGap": "Разрыв масштаба", "testabilityImpact": "Влияние на проверяемость", "version": "Версия", "check": "Проверка", "note": "Заметка"},
-    "sourceTypes": {"hypothesis": "Гипотеза", "condition": "Условие", "breakthrough": "Прорыв", "idea": "Идея", "calculation": "Расчёт", "source": "Источник", "experiment": "Эксперимент", "simulation": "Симуляция", "system": "Система"},
-    "severity": {"info": "Информация", "success": "Успешно", "warning": "Внимание", "critical": "Критично"}
+    "metadata": {
+      "count": "Количество",
+      "condition": "Условие",
+      "status": "Статус",
+      "relationship": "Связь",
+      "gap": "Разрыв",
+      "energyGap": "Энергетический разрыв",
+      "scaleGap": "Разрыв масштаба",
+      "testabilityImpact": "Влияние на проверяемость",
+      "version": "Версия",
+      "check": "Проверка",
+      "note": "Заметка"
+    },
+    "sourceTypes": {
+      "hypothesis": "Гипотеза",
+      "condition": "Условие",
+      "breakthrough": "Прорыв",
+      "idea": "Идея",
+      "calculation": "Расчёт",
+      "source": "Источник",
+      "experiment": "Эксперимент",
+      "simulation": "Симуляция",
+      "system": "Система"
+    },
+    "severity": {
+      "info": "Информация",
+      "success": "Успешно",
+      "warning": "Внимание",
+      "critical": "Критично"
+    },
+    "engineeringModelUpdated": "?????????? ?????? ????????",
+    "engineeringModelUpdatedDescription": "?????? ????????? Engineering Model Studio ????????? ? ???????????? ?????????? ??????."
   },
-  "settings": {"title": "Настройки", "preferredLanguage": "Предпочитаемый язык", "privacy": "Настройки приватности"},
+  "settings": {
+    "title": "Настройки",
+    "preferredLanguage": "Предпочитаемый язык",
+    "privacy": "Настройки приватности"
+  },
   "account": {
     "title": "Аккаунт",
     "privateWorkspace": "Личное исследовательское пространство",
@@ -279,7 +485,10 @@
     "breakthroughs": "Активные прорывы",
     "notSet": "Не указано"
   },
-  "admin": {"title": "Промпты анализа", "placeholder": "Управление промптами пока не подключено"},
+  "admin": {
+    "title": "Промпты анализа",
+    "placeholder": "Управление промптами пока не подключено"
+  },
   "labels": {
     "PHYSICALLY_POSSIBLE_ENGINEERING_BLOCKED": "Физически возможно, но инженерно заблокировано",
     "NEEDS_BREAKTHROUGH": "Нужен прорыв",

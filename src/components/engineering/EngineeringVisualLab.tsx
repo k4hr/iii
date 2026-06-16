@@ -1,13 +1,15 @@
 'use client';
 
 import Link from 'next/link';
+import {useRouter} from 'next/navigation';
 import {animate} from 'animejs';
-import {useEffect, useMemo, useRef, useState} from 'react';
+import {useEffect, useMemo, useRef, useState, useTransition} from 'react';
 import {EngineeringBlueprintOverlay} from '@/components/engineering/EngineeringBlueprintOverlay';
 import {EngineeringChartsPanel} from '@/components/engineering/EngineeringChartsPanel';
+import {EngineeringModelEditorPanel, type EngineeringModelEditorLabels} from '@/components/engineering/EngineeringModelEditorPanel';
 import {EngineeringModelViewer} from '@/components/engineering/EngineeringModelViewer';
 import {buildEngineeringRenderModules} from '@/lib/engineering/build-engineering-model';
-import type {EngineeringSeverity, CanonicalEngineeringModel} from '@/lib/engineering/engineering-model-schema';
+import type {CanonicalEngineeringModel, EngineeringSeverity} from '@/lib/engineering/engineering-model-schema';
 
 export type EngineeringVisualLabLabels = {
   kicker: string;
@@ -34,6 +36,7 @@ export type EngineeringVisualLabLabels = {
   engineeringIntent: string;
   severity: Record<EngineeringSeverity, string>;
   metrics: Record<'research' | 'functionality' | 'testability' | 'confidence' | 'evidence', string>;
+  editor: EngineeringModelEditorLabels;
 };
 
 export type EngineeringRelatedRecords = {
@@ -44,17 +47,42 @@ export type EngineeringRelatedRecords = {
   breakthroughs: Array<{id: string; conditionId: string; title: string; href?: string}>;
 };
 
-export function EngineeringVisualLab({model, labels, records}: {model: CanonicalEngineeringModel; labels: EngineeringVisualLabLabels; records?: EngineeringRelatedRecords}) {
-  const renderModules = useMemo(() => buildEngineeringRenderModules(model), [model]);
+export type EngineeringVisualLabActions = {
+  update: (patch: CanonicalEngineeringModel) => Promise<void>;
+  reset: () => Promise<void>;
+};
+
+export function EngineeringVisualLab({
+  actions,
+  labels,
+  model,
+  records,
+}: {
+  actions?: EngineeringVisualLabActions;
+  labels: EngineeringVisualLabLabels;
+  model: CanonicalEngineeringModel;
+  records?: EngineeringRelatedRecords;
+}) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [editMode, setEditMode] = useState(false);
+  const [draftModel, setDraftModel] = useState(model);
   const [selectedModuleId, setSelectedModuleId] = useState(model.physicalModules[0]?.id ?? '');
   const [exploded, setExploded] = useState(false);
   const [resetSignal, setResetSignal] = useState(0);
   const panelRef = useRef<HTMLDivElement>(null);
-  const selectedModule = model.physicalModules.find(module => module.id === selectedModuleId) ?? model.physicalModules[0];
+  const activeModel = editMode ? draftModel : model;
+  const renderModules = useMemo(() => buildEngineeringRenderModules(activeModel), [activeModel]);
+  const selectedModule = activeModel.physicalModules.find(module => module.id === selectedModuleId) ?? activeModel.physicalModules[0];
   const selectedRenderModule = renderModules.find(module => module.id === selectedModule?.id) ?? renderModules[0];
 
+  useEffect(() => {
+    setDraftModel(model);
+    if (!model.physicalModules.some(module => module.id === selectedModuleId)) setSelectedModuleId(model.physicalModules[0]?.id ?? '');
+  }, [model, selectedModuleId]);
+
   const linked = useMemo(() => {
-    const overlays = model.researchOverlays.filter(overlay => overlay.linkedModuleId === selectedModule?.id);
+    const overlays = activeModel.researchOverlays.filter(overlay => overlay.linkedModuleId === selectedModule?.id);
     const experimentIds = new Set(overlays.filter(overlay => overlay.type === 'experiment').map(overlay => overlay.id.replace(/^experiment-/, '')));
     return {
       overlays,
@@ -64,7 +92,7 @@ export function EngineeringVisualLab({model, labels, records}: {model: Canonical
       experiments: records?.experiments?.filter(item => experimentIds.has(item.id)) ?? [],
       breakthroughs: records?.breakthroughs.filter(item => selectedModule?.linkedConditionIds.includes(item.conditionId)) ?? [],
     };
-  }, [records, selectedModule, model.researchOverlays]);
+  }, [activeModel.researchOverlays, records, selectedModule]);
 
   useEffect(() => {
     const panel = panelRef.current;
@@ -74,68 +102,106 @@ export function EngineeringVisualLab({model, labels, records}: {model: Canonical
   }, [selectedModuleId]);
 
   if (!selectedModule || !selectedRenderModule) return null;
-  const largestGap = model.researchOverlays.reduce<number | null>((value, overlay) => overlay.gapOrders === undefined ? value : value === null ? overlay.gapOrders : Math.max(value, overlay.gapOrders), null);
-  const criticalCount = model.researchOverlays.filter(overlay => overlay.severity === 'critical').length;
+
+  const largestGap = activeModel.researchOverlays.reduce<number | null>((value, overlay) => overlay.gapOrders === undefined ? value : value === null ? overlay.gapOrders : Math.max(value, overlay.gapOrders), null);
+  const criticalCount = activeModel.researchOverlays.filter(overlay => overlay.severity === 'critical').length;
+  const saveDraft = () => {
+    if (!actions) return;
+    startTransition(async () => {
+      await actions.update(draftModel);
+      setEditMode(false);
+      router.refresh();
+    });
+  };
+  const resetToAiModel = () => {
+    if (!actions || !window.confirm(labels.editor.resetConfirm)) return;
+    startTransition(async () => {
+      await actions.reset();
+      setEditMode(false);
+      router.refresh();
+    });
+  };
 
   return (
     <section className="overflow-hidden rounded-[1.75rem] border border-cyan-100/[0.1] bg-[#020708]/95 shadow-[0_0_80px_rgba(24,215,203,.055)]">
       <header className="grid gap-5 border-b border-cyan-100/[0.08] bg-[linear-gradient(90deg,rgba(8,39,42,.72),rgba(0,0,0,.25))] px-5 py-6 sm:px-7 lg:grid-cols-[1fr_auto] lg:items-end">
         <div>
           <div className="section-kicker">{labels.kicker}</div>
-          <h2 className="mt-3 text-2xl font-semibold tracking-[-.035em] text-cyan-50 sm:text-3xl">{model.artifactName}</h2>
-          <p className="mt-3 max-w-3xl text-xs leading-6 text-[#83a2a4]">{model.summary}</p>
+          <h2 className="mt-3 text-2xl font-semibold tracking-[-.035em] text-cyan-50 sm:text-3xl">{activeModel.artifactName}</h2>
+          <p className="mt-3 max-w-3xl text-xs leading-6 text-[#83a2a4]">{activeModel.summary}</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {actions && (
+            <>
+              <ControlButton active={!editMode} onClick={() => { setDraftModel(model); setEditMode(false); }}>{labels.editor.viewMode}</ControlButton>
+              <ControlButton active={editMode} onClick={() => { setDraftModel(model); setEditMode(true); }}>{labels.editor.editMode}</ControlButton>
+            </>
+          )}
           <ControlButton active={exploded} onClick={() => setExploded(value => !value)}>{exploded ? labels.assembledView : labels.explodedView}</ControlButton>
           <ControlButton onClick={() => setResetSignal(value => value + 1)}>{labels.resetCamera}</ControlButton>
         </div>
       </header>
 
-      {model.materiality === 'abstract' && <div className="border-b border-amber-300/10 bg-amber-300/[0.035] px-5 py-3 text-xs leading-5 text-amber-100/65 sm:px-7">{labels.abstractNotice}</div>}
+      {activeModel.materiality === 'abstract' && <div className="border-b border-amber-300/10 bg-amber-300/[0.035] px-5 py-3 text-xs leading-5 text-amber-100/65 sm:px-7">{labels.abstractNotice}</div>}
 
       <div className="grid gap-4 p-3 sm:p-5 xl:grid-cols-[minmax(0,1.5fr)_360px]">
         <div className="relative">
-          <EngineeringModelViewer exploded={exploded} model={model} onSelectModule={setSelectedModuleId} resetSignal={resetSignal} selectedModuleId={selectedModuleId} />
+          <EngineeringModelViewer exploded={exploded} model={activeModel} onSelectModule={setSelectedModuleId} resetSignal={resetSignal} selectedModuleId={selectedModuleId} />
           <EngineeringBlueprintOverlay modules={renderModules} onSelectModule={setSelectedModuleId} selectedModuleId={selectedModuleId} />
           <p className="mt-3 px-2 text-[10px] leading-5 text-cyan-100/35 sm:hidden">{labels.mobileHint}</p>
         </div>
 
         <aside className="space-y-4">
-          <div className="rounded-2xl border border-cyan-100/[0.08] bg-[linear-gradient(145deg,rgba(10,36,39,.72),rgba(0,0,0,.38))] p-5" ref={panelRef}>
-            <div className="flex items-start justify-between gap-4">
-              <div><div className="mono-label">{labels.selectedModule}</div><h3 className="mt-3 text-lg font-semibold text-cyan-50">{selectedModule.name}</h3></div>
-              <StatusPill label={labels.severity[selectedRenderModule.severity]} severity={selectedRenderModule.severity} />
+          {editMode && actions ? (
+            <EngineeringModelEditorPanel
+              isPending={isPending}
+              labels={labels.editor}
+              model={draftModel}
+              onCancel={() => { setDraftModel(model); setEditMode(false); }}
+              onChange={setDraftModel}
+              onReset={resetToAiModel}
+              onSave={saveDraft}
+              onSelectModule={setSelectedModuleId}
+              selectedModuleId={selectedModuleId}
+            />
+          ) : (
+            <div className="rounded-2xl border border-cyan-100/[0.08] bg-[linear-gradient(145deg,rgba(10,36,39,.72),rgba(0,0,0,.38))] p-5" ref={panelRef}>
+              <div className="flex items-start justify-between gap-4">
+                <div><div className="mono-label">{labels.selectedModule}</div><h3 className="mt-3 text-lg font-semibold text-cyan-50">{selectedModule.name}</h3></div>
+                <StatusPill label={labels.severity[selectedRenderModule.severity]} severity={selectedRenderModule.severity} />
+              </div>
+              <p className="mt-3 text-xs font-medium text-cyan-50/65">{selectedModule.role}</p>
+              {selectedModule.description && <p className="mt-2 text-[10px] leading-5 text-cyan-100/45">{selectedModule.description}</p>}
+              <div className="mt-4 flex flex-wrap gap-1.5">
+                {linked.overlays.slice(0, 6).map(overlay => <StatusPill key={overlay.id} label={overlay.gapOrders === undefined ? overlay.title : `${overlay.title} / ${overlay.gapOrders} OOM`} severity={overlay.severity} />)}
+              </div>
+              <div className="mt-5">
+                <div className="flex justify-between font-mono text-[9px] tracking-[.08em] text-cyan-100/45 uppercase"><span>{labels.moduleProgress}</span><span>{selectedModule.feasibilityScore}%</span></div>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/[0.06]"><div className="h-full rounded-full bg-gradient-to-r from-cyan-700 to-cyan-300" style={{width: `${selectedModule.feasibilityScore}%`}} /></div>
+              </div>
             </div>
-            <p className="mt-3 text-xs font-medium text-cyan-50/65">{selectedModule.role}</p>
-            <div className="mt-4 flex flex-wrap gap-1.5">
-              {linked.overlays.slice(0, 6).map(overlay => <StatusPill key={overlay.id} label={overlay.gapOrders === undefined ? overlay.title : `${overlay.title} / ${overlay.gapOrders} OOM`} severity={overlay.severity} />)}
-            </div>
-            <div className="mt-5">
-              <div className="flex justify-between font-mono text-[9px] tracking-[.08em] text-cyan-100/45 uppercase"><span>{labels.moduleProgress}</span><span>{selectedModule.feasibilityScore}%</span></div>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/[0.06]"><div className="h-full rounded-full bg-gradient-to-r from-cyan-700 to-cyan-300" style={{width: `${selectedModule.feasibilityScore}%`}} /></div>
-            </div>
-          </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
-            <MetricCard label={labels.artifactType} value={model.artifactLabel} />
-            <MetricCard label={labels.gapOrders} value={largestGap === null ? '—' : `${largestGap} OOM`} />
+            <MetricCard label={labels.artifactType} value={activeModel.artifactLabel} />
+            <MetricCard label={labels.gapOrders} value={largestGap === null ? '-' : `${largestGap} OOM`} />
             <MetricCard label={labels.criticalModules} value={String(criticalCount).padStart(2, '0')} />
             <MetricCard label={labels.sourceCandidates} value={String(records?.sources.length ?? 0).padStart(2, '0')} />
           </div>
 
-          <InfoPanel label={labels.engineeringIntent} value={model.engineeringIntent} />
+          <InfoPanel label={labels.engineeringIntent} value={activeModel.engineeringIntent} />
           <LinkedPanel items={linked.conditions} label={labels.linkedBlockers} noItems={labels.noLinkedItems} open={labels.open} />
           <LinkedPanel items={linked.calculations} label={labels.linkedCalculations} noItems={labels.noLinkedItems} open={labels.open} />
           <LinkedPanel items={linked.sources} label={labels.sourceCandidates} noItems={labels.noLinkedItems} open={labels.open} />
           {linked.experiments.length > 0 && <LinkedPanel items={linked.experiments} label={labels.charts} noItems={labels.noLinkedItems} open={labels.open} />}
           {linked.breakthroughs.length > 0 && <LinkedPanel items={linked.breakthroughs} label={labels.activeBreakthroughs} noItems={labels.noLinkedItems} open={labels.open} />}
-          <InfoPanel label={labels.nextEngineeringStep} value={model.nextEngineeringStep} />
+          <InfoPanel label={labels.nextEngineeringStep} value={activeModel.nextEngineeringStep} />
         </aside>
       </div>
 
       <div className="border-t border-cyan-100/[0.07] p-4 sm:p-5">
         <div className="mb-3 mono-label">{labels.charts}</div>
-        <EngineeringChartsPanel model={model} />
+        <EngineeringChartsPanel model={activeModel} />
       </div>
     </section>
   );
@@ -166,7 +232,7 @@ function LinkedPanel({label, items, noItems, open}: {label: string; items: Array
         {items.length ? items.slice(0, 4).map(item => (
           <div className="flex items-start justify-between gap-3 rounded-lg border border-cyan-100/[0.06] bg-white/[0.015] p-2.5" key={item.id}>
             <span className="text-[10px] leading-4 text-cyan-50/65">{item.title}</span>
-            {item.href && <Link aria-label={open} className="shrink-0 font-mono text-[9px] text-cyan-200/55 hover:text-cyan-100" href={item.href}>↗</Link>}
+            {item.href && <Link aria-label={open} className="shrink-0 font-mono text-[9px] text-cyan-200/55 hover:text-cyan-100" href={item.href}>Open</Link>}
           </div>
         )) : <p className="text-[10px] text-cyan-100/30">{noItems}</p>}
       </div>

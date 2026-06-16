@@ -150,8 +150,24 @@
     "open": "Open linked workspace",
     "more": "and {count} more",
     "selected": "Selected node",
-    "nodeTypes": {"hypothesis": "Hypothesis", "condition": "Condition", "blocker": "Critical blocker", "calculation": "Calculation", "source": "Source candidate", "breakthrough": "Active breakthrough"},
-    "legend": {"title": "Legend", "hypothesis": "Hypothesis", "condition": "Condition", "blocker": "Critical blocker", "calculation": "Calculation", "source": "Source candidate", "connection": "Connection", "progress": "Progress"}
+    "nodeTypes": {
+      "hypothesis": "Hypothesis",
+      "condition": "Condition",
+      "blocker": "Critical blocker",
+      "calculation": "Calculation",
+      "source": "Source candidate",
+      "breakthrough": "Active breakthrough"
+    },
+    "legend": {
+      "title": "Legend",
+      "hypothesis": "Hypothesis",
+      "condition": "Condition",
+      "blocker": "Critical blocker",
+      "calculation": "Calculation",
+      "source": "Source candidate",
+      "connection": "Connection",
+      "progress": "Progress"
+    }
   },
   "engineeringLab": {
     "kicker": "ENGINEERING BLUEPRINT V2",
@@ -178,8 +194,133 @@
     "abstractNotice": "This hypothesis is primarily abstract. The 3D view shows a structural dependency model until a measurable physical carrier is defined.",
     "engineeringIntent": "Engineering intent",
     "nextEngineeringStep": "Next engineering step",
-    "severity": {"info": "Under review", "success": "Ready", "warning": "Engineering gap", "critical": "Critical blocker"},
-    "metrics": {"research": "Research", "functionality": "Functionality", "testability": "Testability", "confidence": "Confidence", "evidence": "Evidence"}
+    "severity": {
+      "info": "Under review",
+      "success": "Ready",
+      "warning": "Engineering gap",
+      "critical": "Critical blocker"
+    },
+    "metrics": {
+      "research": "Research",
+      "functionality": "Functionality",
+      "testability": "Testability",
+      "confidence": "Confidence",
+      "evidence": "Evidence"
+    },
+    "editor": {
+      "viewMode": "View",
+      "editMode": "Edit",
+      "warning": "Manual changes are saved over the AI model.",
+      "save": "Save model",
+      "saving": "Saving...",
+      "cancel": "Cancel",
+      "addModule": "Add module",
+      "deleteModule": "Delete module",
+      "deleteModuleDisabled": "Only user-added modules can be deleted.",
+      "moduleName": "Module name",
+      "moduleRole": "Role",
+      "moduleDescription": "Description",
+      "category": "Category",
+      "geometryHint": "Geometry hint",
+      "positionHint": "Position hint",
+      "feasibility": "Feasibility score",
+      "reset": "Reset to AI model",
+      "resetConfirm": "Reset the engineering model to a newly generated AI model? Manual edits will be overwritten.",
+      "geometryPrimitives": "Geometry primitives",
+      "addPrimitive": "Add primitive",
+      "deletePrimitive": "Delete primitive",
+      "shape": "Shape",
+      "position": "Position",
+      "rotation": "Rotation",
+      "scale": "Scale",
+      "materialRole": "Material role",
+      "opacity": "Opacity",
+      "researchOverlays": "Research overlays",
+      "addOverlay": "Add overlay",
+      "deleteOverlay": "Delete overlay",
+      "overlayTitle": "Overlay title",
+      "overlayType": "Overlay type",
+      "severityLabel": "Severity",
+      "categories": {
+        "body": "Body",
+        "cabin": "Cabin",
+        "lift": "Lift system",
+        "propulsion": "Propulsion",
+        "energy": "Energy",
+        "control": "Control",
+        "thermal": "Thermal",
+        "safety": "Safety",
+        "sensor": "Sensor",
+        "material": "Material",
+        "measurement": "Measurement",
+        "unknown": "Unknown"
+      },
+      "geometryHints": {
+        "body": "Body",
+        "cabin": "Cabin",
+        "wing": "Wing",
+        "rotor": "Rotor",
+        "thruster": "Thruster",
+        "battery_pack": "Battery pack",
+        "control_core": "Control core",
+        "heat_sink": "Heat sink",
+        "sensor_array": "Sensor array",
+        "shield": "Shield",
+        "frame": "Frame",
+        "cell_stack": "Cell stack",
+        "generic": "Generic"
+      },
+      "positions": {
+        "center": "Center",
+        "front": "Front",
+        "rear": "Rear",
+        "left": "Left",
+        "right": "Right",
+        "top": "Top",
+        "bottom": "Bottom",
+        "internal": "Internal",
+        "external": "External"
+      },
+      "shapes": {
+        "box": "Box",
+        "rounded_box": "Rounded box",
+        "sphere": "Sphere",
+        "cylinder": "Cylinder",
+        "cone": "Cone",
+        "torus": "Torus",
+        "disc": "Disc",
+        "ring": "Ring",
+        "wing": "Wing",
+        "curved_blade": "Curved blade",
+        "panel": "Panel",
+        "capsule": "Capsule",
+        "tube": "Tube",
+        "lattice": "Lattice",
+        "cell_stack": "Cell stack"
+      },
+      "materialRoles": {
+        "body": "Body",
+        "glass": "Glass",
+        "energy": "Energy",
+        "thermal": "Thermal",
+        "control": "Control",
+        "propulsion": "Propulsion",
+        "sensor": "Sensor",
+        "shield": "Shield",
+        "structure": "Structure",
+        "unknown": "Unknown"
+      },
+      "overlayTypes": {
+        "blocker": "Blocker",
+        "calculation": "Calculation",
+        "source": "Source",
+        "experiment": "Experiment",
+        "breakthrough": "Breakthrough"
+      },
+      "newModuleName": "Custom module",
+      "newModuleRole": "User-defined physical module.",
+      "newOverlayTitle": "Research overlay"
+    }
   },
   "experiments": {
     "title": "Experiments",
@@ -232,7 +373,12 @@
       "notes": "Scenario notes",
       "notesPlaceholder": "Assumptions, constraints or what changed in this scenario...",
       "run": "Recalculate parameters",
-      "effects": {"low": "Low / trace effect", "medium": "Medium effect", "high": "High effect", "extreme": "Extreme effect"}
+      "effects": {
+        "low": "Low / trace effect",
+        "medium": "Medium effect",
+        "high": "High effect",
+        "extreme": "Extreme effect"
+      }
     }
   },
   "sources": {
@@ -270,8 +416,10 @@
     "parametersChanged": "Parameters changed",
     "modelParametersRecalculated": "Model parameters recalculated",
     "engineeringModelRegenerated": "Engineering model regenerated",
+    "engineeringModelUpdated": "Engineering model updated",
     "parameterCalculationDescription": "The deterministic model was recalculated with a new parameter set.",
     "engineeringModelRegeneratedDescription": "The engineering synthesis was rebuilt from the latest conditions, calculations, sources and breakthrough sessions.",
+    "engineeringModelUpdatedDescription": "Manual Engineering Model Studio edits were saved to the canonical engineering model.",
     "versionCreated": "Hypothesis version created",
     "userNote": "Research note added",
     "conditionTreeDescription": "{count} research conditions were generated.",
@@ -285,9 +433,36 @@
     "ideaReviewDescription": "The proposal received a structured diagnostic check.",
     "experimentDescription": "A testable experiment protocol was proposed.",
     "simulationDescription": "A simulation scenario was created for the hypothesis.",
-    "metadata": {"count": "Count", "condition": "Condition", "status": "Status", "relationship": "Relationship", "gap": "Gap", "energyGap": "Energy gap", "scaleGap": "Scale gap", "testabilityImpact": "Testability impact", "version": "Version", "check": "Check", "note": "Note"},
-    "sourceTypes": {"hypothesis": "Hypothesis", "condition": "Condition", "breakthrough": "Breakthrough", "idea": "Idea", "calculation": "Calculation", "source": "Source", "experiment": "Experiment", "simulation": "Simulation", "system": "System"},
-    "severity": {"info": "Info", "success": "Success", "warning": "Warning", "critical": "Critical"}
+    "metadata": {
+      "count": "Count",
+      "condition": "Condition",
+      "status": "Status",
+      "relationship": "Relationship",
+      "gap": "Gap",
+      "energyGap": "Energy gap",
+      "scaleGap": "Scale gap",
+      "testabilityImpact": "Testability impact",
+      "version": "Version",
+      "check": "Check",
+      "note": "Note"
+    },
+    "sourceTypes": {
+      "hypothesis": "Hypothesis",
+      "condition": "Condition",
+      "breakthrough": "Breakthrough",
+      "idea": "Idea",
+      "calculation": "Calculation",
+      "source": "Source",
+      "experiment": "Experiment",
+      "simulation": "Simulation",
+      "system": "System"
+    },
+    "severity": {
+      "info": "Info",
+      "success": "Success",
+      "warning": "Warning",
+      "critical": "Critical"
+    }
   },
   "settings": {
     "title": "Settings",

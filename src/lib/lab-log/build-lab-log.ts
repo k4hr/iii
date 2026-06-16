@@ -111,6 +111,7 @@ export async function buildLabLog(input: BuildLabLogInput): Promise<LabLogItem[]
   const conditionById = new Map(conditions.map(condition => [condition.id, localizeMockValue(condition, locale)]));
   const ideaChecks = new Set(ideas.flatMap(idea => idea.checks.map(() => idea.id)));
   const calculationIds = new Set(calculations.map(calculation => calculation.id));
+  const hasEngineeringModelVersionUpdate = versions.some(version => version.changeSummary === 'ENGINEERING_MODEL_UPDATED');
 
   if (!breakthroughOnly) {
     for (const hypothesis of hypotheses) {
@@ -174,14 +175,15 @@ export async function buildLabLog(input: BuildLabLogInput): Promise<LabLogItem[]
     }
 
     for (const version of versions.filter(version => version.versionNumber > 1)) {
+      const isEngineeringModelUpdate = version.changeSummary === 'ENGINEERING_MODEL_UPDATED';
       items.push({
         id: `version-${version.id}`,
         timestamp: version.createdAt,
-        type: 'HYPOTHESIS_VERSION_CREATED',
-        title: labels.versionCreated,
-        description: version.changeSummary || version.title,
+        type: isEngineeringModelUpdate ? 'ENGINEERING_MODEL_UPDATED' : 'HYPOTHESIS_VERSION_CREATED',
+        title: isEngineeringModelUpdate ? labels.engineeringModelUpdated : labels.versionCreated,
+        description: isEngineeringModelUpdate ? labels.engineeringModelUpdatedDescription : version.changeSummary || version.title,
         severity: 'info',
-        sourceType: 'hypothesis',
+        sourceType: isEngineeringModelUpdate ? 'system' : 'hypothesis',
         href: `/${locale}/hypotheses/${version.hypothesisId}`,
         metadata: {[labels.metadata.version]: version.versionNumber},
       });
@@ -309,6 +311,7 @@ export async function buildLabLog(input: BuildLabLogInput): Promise<LabLogItem[]
     const message = stringValue(content.message);
     if (calculationRunId && calculationIds.has(calculationRunId)) continue;
     if (event.type === 'AI_REASONING_STEP' && ideaId && ideaChecks.has(ideaId)) continue;
+    if (!breakthroughOnly && hasEngineeringModelVersionUpdate && event.type === 'AI_REASONING_STEP' && stringValue(content.eventKey) === 'ENGINEERING_MODEL_UPDATED') continue;
     if (event.type === 'STATUS_CHANGED' && /started|начат/i.test(message)) continue;
     const mapped = mapBreakthroughEvent(event.type, content, labels, locale);
     const linkedHypothesisId = stringValue(content.hypothesisId);
@@ -351,6 +354,15 @@ function mapBreakthroughEvent(
   if (type === 'AI_REASONING_STEP' && stringValue(content.eventKey) === 'ENGINEERING_MODEL_REGENERATED') return {
     title: labels.engineeringModelRegenerated,
     description: stringValue(content.message) || labels.engineeringModelRegeneratedDescription,
+    severity: 'success',
+    sourceType: 'system',
+    metadata: {
+      [labels.metadata.count]: numberValue(content.physicalModules),
+    },
+  };
+  if (type === 'AI_REASONING_STEP' && stringValue(content.eventKey) === 'ENGINEERING_MODEL_UPDATED') return {
+    title: labels.engineeringModelUpdated,
+    description: stringValue(content.message) || labels.engineeringModelUpdatedDescription,
     severity: 'success',
     sourceType: 'system',
     metadata: {
