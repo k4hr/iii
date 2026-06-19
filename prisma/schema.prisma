@@ -440,8 +440,8 @@ model ExperimentProposal {
   requiredEquipmentJson  Json
   expectedSignal         String?
   falsificationCriteria  String?
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 
   @@index([hypothesisId, createdAt])
   @@index([conditionId])
