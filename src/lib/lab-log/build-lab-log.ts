@@ -398,6 +398,13 @@ function mapBreakthroughEvent(
     sourceType: 'system',
     metadata: {[labels.metadata.task]: stringValue(content.taskTitles)},
   };
+  if (type === 'AI_REASONING_STEP' && stringValue(content.eventKey) === 'EXPERIMENT_GENERATED') return {
+    title: labels.experimentProposed,
+    description: stringValue(content.message) || labels.experimentDescription,
+    severity: 'success',
+    sourceType: 'experiment',
+    metadata: {[labels.metadata.task]: stringValue(content.title)},
+  };
   if (type === 'STATUS_CHANGED') return {title: labels.statusChanged, description: stringValue(content.description), severity: 'info', sourceType: 'breakthrough', metadata: {[labels.metadata.status]: getEnumLabel(stringValue(content.status), locale)}};
   if (type === 'USER_NOTE') return {title: labels.userNote, description: stringValue(content.note), severity: 'info', sourceType: 'idea', metadata: stringValue(content.note) ? {[labels.metadata.note]: stringValue(content.note)} : undefined};
   if (type === 'AI_REASONING_STEP') return {title: labels.deeperBreakdown, description: stringValue(content.description) || labels.analysisDescription, severity: 'info', sourceType: 'system'};

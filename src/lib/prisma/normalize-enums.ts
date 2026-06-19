@@ -1,7 +1,9 @@
 import {
   ConditionImportance,
   ConditionStatus,
+  ExperimentCostLevel,
   ExperimentDifficulty,
+  ExperimentStatus,
   ExperimentType,
   HypothesisOverallStatus,
   IdeaStatus,
@@ -26,8 +28,10 @@ export const normalizeIdeaStatus = (value: unknown) => normalizeEnum(value, Obje
 export const normalizeRealityGap = (value: unknown) => normalizeEnum(value, Object.values(RealityGapLevel), RealityGapLevel.UNKNOWN);
 export const normalizeConditionStatus = (value: unknown) => normalizeEnum(value, Object.values(ConditionStatus), ConditionStatus.UNDEFINED);
 export const normalizeConditionImportance = (value: unknown) => normalizeEnum(value, Object.values(ConditionImportance), ConditionImportance.MEDIUM);
+export const normalizeExperimentCostLevel = (value: unknown) => normalizeEnum(value, Object.values(ExperimentCostLevel), ExperimentCostLevel.UNKNOWN);
 export const normalizeExperimentType = (value: unknown) => normalizeEnum(value, Object.values(ExperimentType), ExperimentType.THOUGHT_EXPERIMENT);
 export const normalizeExperimentDifficulty = (value: unknown) => normalizeEnum(value, Object.values(ExperimentDifficulty), ExperimentDifficulty.MEDIUM);
+export const normalizeExperimentStatus = (value: unknown) => normalizeEnum(value, Object.values(ExperimentStatus), ExperimentStatus.PROPOSED);
 export const normalizeSafetyLevel = (value: unknown) => normalizeEnum(value, Object.values(SafetyLevel), SafetyLevel.THEORETICAL_ONLY);
 export const normalizeSourceType = (value: unknown) => normalizeEnum(value, Object.values(SourceType), SourceType.MOCK);
 export const normalizeSourceRelationship = (value: unknown) => normalizeEnum(value, Object.values(SourceRelationship), SourceRelationship.BACKGROUND);

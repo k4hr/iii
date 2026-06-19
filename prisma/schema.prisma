@@ -138,6 +138,22 @@ enum ExperimentDifficulty {
   HIGH
   EXTREME
 }
+enum ExperimentCostLevel {
+  LOW
+  MEDIUM
+  HIGH
+  EXTREME
+  UNKNOWN
+}
+enum ExperimentStatus {
+  DRAFT
+  PROPOSED
+  READY
+  RUNNING
+  COMPLETED
+  FAILED
+  ARCHIVED
+}
 enum SafetyLevel {
   SAFE
   CAUTION
@@ -401,15 +417,35 @@ model ExperimentProposal {
   hypothesis             Hypothesis @relation(fields: [hypothesisId], references: [id], onDelete: Cascade)
   conditionId            String?
   condition              HypothesisCondition? @relation(fields: [conditionId], references: [id], onDelete: SetNull)
+  breakthroughSessionId  String?
+  breakthroughSession    BreakthroughSession? @relation(fields: [breakthroughSessionId], references: [id], onDelete: SetNull)
   title                  String
   description            String
+  objective              String?
+  hypothesisBeingTested  String?
+  setupJson              Json?
+  variablesJson          Json?
+  measurementsJson       Json?
+  equipmentJson          Json?
+  procedureJson          Json?
+  expectedResultsJson    Json?
+  successCriteriaJson    Json?
+  risksJson              Json?
+  costLevel              ExperimentCostLevel @default(UNKNOWN)
+  difficultyLevel        ExperimentDifficulty?
   experimentType         ExperimentType
   difficulty             ExperimentDifficulty
   safetyLevel            SafetyLevel
+  status                 ExperimentStatus @default(PROPOSED)
   requiredEquipmentJson  Json
   expectedSignal         String?
   falsificationCriteria  String?
   createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([hypothesisId, createdAt])
+  @@index([conditionId])
+  @@index([breakthroughSessionId])
 }
 
 model SimulationRun {
@@ -468,6 +504,7 @@ model BreakthroughSession {
   events          BreakthroughEvent[]
   calculationRuns CalculationRun[]
   researchTasks   ResearchTask[]
+  experiments     ExperimentProposal[]
 
   @@index([ownerId])
 }

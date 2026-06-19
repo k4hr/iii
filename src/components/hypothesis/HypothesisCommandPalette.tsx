@@ -20,6 +20,7 @@ export function HypothesisCommandPalette({
 }: {
   actions: {
     discoverSources: CommandAction;
+    generateExperiment: CommandAction;
     regenerateModel: CommandAction;
     runCalculation: CommandAction;
     startBreakthrough?: CommandAction;
@@ -30,6 +31,7 @@ export function HypothesisCommandPalette({
     copied: string;
     copyLink: string;
     discoverSources: string;
+    generateExperiment: string;
     openCalculations: string;
     openCurrentObjective: string;
     openEngineeringModel: string;
@@ -106,6 +108,7 @@ export function HypothesisCommandPalette({
     {id: 'open-calculations', label: labels.openCalculations, run: () => openSection(links.calculations)},
     {id: 'run-calculation', label: labels.runCalculation, tone: 'action', run: () => runServerAction('run-calculation', actions.runCalculation)},
     {id: 'discover-sources', label: labels.discoverSources, tone: 'action', run: () => runServerAction('discover-sources', actions.discoverSources)},
+    {id: 'generate-experiment', label: labels.generateExperiment, tone: 'action', run: () => runServerAction('generate-experiment', actions.generateExperiment)},
     {
       id: 'start-breakthrough',
       label: labels.startBreakthrough,

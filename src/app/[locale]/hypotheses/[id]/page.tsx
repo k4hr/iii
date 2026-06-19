@@ -7,6 +7,7 @@ import {EngineeringVisualLab} from '@/components/engineering/EngineeringVisualLa
 import {RegenerateEngineeringModelButton} from '@/components/engineering/RegenerateEngineeringModelButton';
 import {CalculationCard} from '@/components/calculations/CalculationCard';
 import {ParameterPlayground} from '@/components/calculations/ParameterPlayground';
+import {ExperimentPlanCard, type ExperimentPlanLabels} from '@/components/experiments/ExperimentPlanCard';
 import {LabLogTimeline} from '@/components/lab-log/LabLogTimeline';
 import {SourceCandidateCard} from '@/components/sources/SourceCandidateCard';
 import {GlassPanel} from '@/components/ui/GlassPanel';
@@ -34,6 +35,7 @@ import {parseEngineeringModel} from '@/lib/engineering/engineering-model-schema'
 import {enrichEngineeringModelContext, synthesizeEngineeringModelFallback} from '@/lib/engineering/generate-engineering-model';
 import {runCalculationAction, runParameterCalculationAction} from '@/server/actions/calculations';
 import {discoverSourcesAction} from '@/server/actions/sources';
+import {generateExperimentAction} from '@/server/actions/experiments';
 import {regenerateEngineeringModelAction, resetEngineeringModelAction, startBreakthroughAction, updateEngineeringModelAction} from '@/server/actions/hypotheses';
 import {syncResearchMissionAction} from '@/server/actions/workflow';
 import {getCurrentUser} from '@/lib/auth/current-user';
@@ -63,7 +65,7 @@ export default async function HypothesisPage({params, searchParams}: {params: Pr
       analyses: {orderBy: {createdAt: 'desc'}, take: 1, include: {translations: true}},
       conditions: {orderBy: [{importance: 'asc'}, {createdAt: 'asc'}]},
       visualScenes: {take: 1, orderBy: {createdAt: 'desc'}},
-      experiments: true,
+      experiments: {orderBy: {createdAt: 'desc'}},
       sources: {orderBy: {createdAt: 'desc'}},
       versions: true,
       simulationRuns: true,
@@ -122,6 +124,23 @@ export default async function HypothesisPage({params, searchParams}: {params: Pr
       run: calc('playground.run'),
       effects: {low: calc('playground.effects.low'), medium: calc('playground.effects.medium'), high: calc('playground.effects.high'), extreme: calc('playground.effects.extreme')},
     },
+  };
+  const experimentPlanLabels: ExperimentPlanLabels = {
+    cost: e('cost'),
+    dataToCollect: e('dataToCollect'),
+    difficulty: e('difficulty'),
+    expectedResult: e('expectedResult'),
+    experimentGoal: e('experimentGoal'),
+    falsification: e('falsification'),
+    measurements: e('measurements'),
+    minimumViableTest: e('minimumViableTest'),
+    procedure: e('procedure'),
+    risks: e('risks'),
+    safety: e('safety'),
+    setup: e('setup'),
+    successCriteria: e('successCriteria'),
+    variables: e('variables'),
+    whatWeTest: e('whatWeTest'),
   };
   const latestParameterRun = hypothesis.calculationRuns.find(calculation => !calculation.breakthroughSessionId && isParameterCalculationInput(calculation.inputJson));
   const calculationHistory = latestParameterRun
@@ -508,6 +527,7 @@ export default async function HypothesisPage({params, searchParams}: {params: Pr
           <HypothesisCommandPalette
             actions={{
               discoverSources: discoverSourcesAction.bind(null, locale, hypothesis.id, undefined),
+              generateExperiment: generateExperimentAction.bind(null, locale, hypothesis.id, primaryBlocker?.id, primarySession?.id),
               regenerateModel: regenerateEngineeringModelAction.bind(null, locale, hypothesis.id),
               runCalculation: runCalculationAction.bind(null, locale, hypothesis.id, undefined, undefined),
               ...(primaryBlocker?.id ? {startBreakthrough: startBreakthroughAction.bind(null, locale, primaryBlocker.id)} : {}),
@@ -518,6 +538,7 @@ export default async function HypothesisPage({params, searchParams}: {params: Pr
               copied: cockpitT('copied'),
               copyLink: cockpitT('copyLink'),
               discoverSources: cockpitT('discoverSources'),
+              generateExperiment: e('generate'),
               openCalculations: cockpitT('openCalculations'),
               openCurrentObjective: cockpitT('openCurrentObjective'),
               openEngineeringModel: cockpitT('openEngineeringModel'),
@@ -672,7 +693,28 @@ export default async function HypothesisPage({params, searchParams}: {params: Pr
 
       {selectedSection === 'sources' && <HypothesisActiveSection code="SRC-05" description={sourceT('description')} title={sourceT('title')}><div className="mb-5 flex justify-end"><form action={discoverSourcesAction.bind(null, locale, hypothesis.id, undefined)}><PendingActionButton idleLabel={sourceT('discover')} pendingLabel={cockpitT('pending')} /></form></div>{sources.length ? <div className="grid gap-4 md:grid-cols-2">{sources.map(source => <SourceCandidateCard source={source} summary={source.summary} locale={locale} labels={{candidate: sourceT('candidate'), openSearch: sourceT('openSearch')}} key={source.id} />)}</div> : <TaskEmptyState openTask={cockpitT('mission.openTask')} task={missionTaskByType.get('DISCOVER_SOURCES')} text={sourceT('empty')} />}</HypothesisActiveSection>}
 
-      {selectedSection === 'experiments' && <HypothesisActiveSection code="EXP-06" description={cockpitT('experimentsDescription')} title={t('tabs.experiments')}>{experiments.length ? <div className="grid gap-4 md:grid-cols-2">{experiments.map((experiment, index) => <ExperimentCard experiment={experiment} index={index} labels={{signal: e('signal'), falsification: e('falsification')}} locale={locale} key={experiment.id} />)}</div> : <TaskEmptyState openTask={cockpitT('mission.openTask')} task={missionTaskByType.get('DESIGN_EXPERIMENT')} text={cockpitT('emptyExperiments')} />}</HypothesisActiveSection>}
+      {selectedSection === 'experiments' && (
+        <HypothesisActiveSection code="EXP-06" description={cockpitT('experimentsDescription')} title={e('designer')}>
+          <GlassPanel glow className="data-grid mb-5 p-5 sm:p-6">
+            <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
+              <div>
+                <div className="section-kicker">{e('title')}</div>
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-[#91adaf]">{e('designerDescription')}</p>
+              </div>
+              <form action={generateExperimentAction.bind(null, locale, hypothesis.id, primaryBlocker?.id, primarySession?.id)}>
+                <PendingActionButton idleLabel={e('generate')} pendingLabel={cockpitT('pending')} />
+              </form>
+            </div>
+          </GlassPanel>
+          {experiments.length ? (
+            <div className="grid gap-4">
+              {experiments.map((experiment, index) => <ExperimentPlanCard experiment={experiment} index={index} labels={experimentPlanLabels} locale={locale} key={experiment.id} />)}
+            </div>
+          ) : (
+            <TaskEmptyState openTask={cockpitT('mission.openTask')} task={missionTaskByType.get('DESIGN_EXPERIMENT')} text={cockpitT('emptyExperiments')} />
+          )}
+        </HypothesisActiveSection>
+      )}
 
       {selectedSection === 'breakthroughs' && <HypothesisActiveSection code="BRK-07" description={cockpitT('activeBreakthroughsDescription')} title={cockpitT('activeBreakthroughs')}>{visualLabBreakthroughs.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{visualLabBreakthroughs.map(session => <BreakthroughSessionCard href={session.href} key={session.id} open={cockpitT('open')} progress={session.progressScore} title={session.title} />)}</div> : <TaskEmptyState openTask={cockpitT('mission.openTask')} task={missionTaskByType.get('START_BREAKTHROUGH')} text={cockpitT('emptyBreakthroughs')} />}</HypothesisActiveSection>}
 
@@ -713,6 +755,9 @@ function toMissionTaskView({
     }
     if (task.type === 'START_BREAKTHROUGH' && task.conditionId) {
       return <form action={startBreakthroughAction.bind(null, locale, task.conditionId)}><PendingActionButton idleLabel={task.actionLabel} pendingLabel={labels.pending} /></form>;
+    }
+    if (task.type === 'DESIGN_EXPERIMENT') {
+      return <form action={generateExperimentAction.bind(null, locale, hypothesisId, task.conditionId ?? undefined, task.breakthroughSessionId ?? undefined)}><PendingActionButton idleLabel={task.actionLabel} pendingLabel={labels.pending} /></form>;
     }
     return <GlowButton href={href} variant="secondary">{task.actionLabel || labels.openTask}</GlowButton>;
   })();

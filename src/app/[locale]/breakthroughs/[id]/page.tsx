@@ -3,7 +3,9 @@ import {prisma} from '@/lib/db/prisma';
 import {addIdeaAction, addUserNoteAction} from '@/server/actions/breakthroughs';
 import {runCalculationAction, runParameterCalculationAction} from '@/server/actions/calculations';
 import {discoverSourcesAction} from '@/server/actions/sources';
+import {generateExperimentAction} from '@/server/actions/experiments';
 import {CalculationCard} from '@/components/calculations/CalculationCard';
+import {ExperimentPlanCard, type ExperimentPlanLabels} from '@/components/experiments/ExperimentPlanCard';
 import {ParameterPlayground} from '@/components/calculations/ParameterPlayground';
 import {LabLogTimeline} from '@/components/lab-log/LabLogTimeline';
 import {SourceCandidateCard} from '@/components/sources/SourceCandidateCard';
@@ -23,6 +25,7 @@ import {notFound, redirect} from 'next/navigation';
 export default async function BreakthroughPage({params}: {params: Promise<{locale: string; id: string}>}) {
   const {locale, id} = await params;
   const t = await getTranslations('breakthrough');
+  const e = await getTranslations('experiments');
   const calc = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'calculations'});
   const sourceT = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'sources'});
   const labT = await getTranslations({locale: locale === 'ru' ? 'ru' : 'en', namespace: 'labLog'});
@@ -30,7 +33,7 @@ export default async function BreakthroughPage({params}: {params: Promise<{local
   if (!user) redirect(`/${locale}/login`);
   const session = await prisma.breakthroughSession.findFirst({
     where: {id, ownerId: user.id},
-    include: {condition: {include: {sourceReferences: {orderBy: {createdAt: 'desc'}}}}, hypothesis: {include: {analyses: {orderBy: {createdAt: 'desc'}, take: 1}}}, ideas: {orderBy: {createdAt: 'desc'}, include: {checks: true}}, calculationRuns: {orderBy: {createdAt: 'desc'}}},
+    include: {condition: {include: {sourceReferences: {orderBy: {createdAt: 'desc'}}}}, hypothesis: {include: {analyses: {orderBy: {createdAt: 'desc'}, take: 1}}}, ideas: {orderBy: {createdAt: 'desc'}, include: {checks: true}}, calculationRuns: {orderBy: {createdAt: 'desc'}}, experiments: {orderBy: {createdAt: 'desc'}}},
   });
 
   if (!session) notFound();
@@ -96,6 +99,23 @@ export default async function BreakthroughPage({params}: {params: Promise<{local
       run: calc('playground.run'),
       effects: {low: calc('playground.effects.low'), medium: calc('playground.effects.medium'), high: calc('playground.effects.high'), extreme: calc('playground.effects.extreme')},
     },
+  };
+  const experimentPlanLabels: ExperimentPlanLabels = {
+    cost: e('cost'),
+    dataToCollect: e('dataToCollect'),
+    difficulty: e('difficulty'),
+    expectedResult: e('expectedResult'),
+    experimentGoal: e('experimentGoal'),
+    falsification: e('falsification'),
+    measurements: e('measurements'),
+    minimumViableTest: e('minimumViableTest'),
+    procedure: e('procedure'),
+    risks: e('risks'),
+    safety: e('safety'),
+    setup: e('setup'),
+    successCriteria: e('successCriteria'),
+    variables: e('variables'),
+    whatWeTest: e('whatWeTest'),
   };
   const latestParameterRun = session.calculationRuns.find(calculation => isParameterCalculationInput(calculation.inputJson));
   const calculationHistory = latestParameterRun
@@ -188,6 +208,25 @@ export default async function BreakthroughPage({params}: {params: Promise<{local
           </div>
         ) : (
           !latestParameterRun && <p className="mt-4 rounded-xl border border-dashed border-cyan-100/[0.1] px-5 py-4 text-xs text-[#78999b]">{calc('empty')}</p>
+        )}
+      </section>
+
+      <section>
+        <CockpitHeader code="EXP-03" title={e('designer')} status={`${session.experiments.length} ${e('title')}`} />
+        <GlassPanel glow className="data-grid mt-5 p-5 sm:p-6">
+          <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
+            <p className="max-w-3xl text-sm leading-6 text-[#91adaf]">{e('designerDescription')}</p>
+            <form action={generateExperimentAction.bind(null, locale, session.hypothesisId, session.conditionId, session.id)}>
+              <GlowButton>{e('generate')}</GlowButton>
+            </form>
+          </div>
+        </GlassPanel>
+        {session.experiments.length ? (
+          <div className="mt-4 grid gap-4">
+            {session.experiments.map((experiment, index) => <ExperimentPlanCard experiment={experiment} index={index} labels={experimentPlanLabels} locale={locale} key={experiment.id} />)}
+          </div>
+        ) : (
+          <p className="mt-4 rounded-xl border border-dashed border-cyan-100/[0.1] px-5 py-4 text-xs text-[#78999b]">{e('empty')}</p>
         )}
       </section>
 
