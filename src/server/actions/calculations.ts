@@ -8,6 +8,7 @@ import {localizeMockValue} from '@/lib/locale/mock-copy';
 import {requireCurrentUser} from '@/lib/auth/current-user';
 import {normalizeScale} from '@/lib/prisma/normalize-enums';
 import {toPrismaJsonObject} from '@/lib/prisma/safe-json';
+import {completeResearchTaskForHypothesis, syncResearchTasksForHypothesis} from '@/lib/workflow/research-mission-control';
 
 export async function runCalculationAction(
   locale: string,
@@ -91,6 +92,8 @@ export async function runCalculationAction(
     return created;
   });
 
+  await completeResearchTaskForHypothesis({hypothesisId, ownerId: user.id, type: 'RUN_CALCULATION', conditionId: condition?.id});
+  await syncResearchTasksForHypothesis({hypothesisId, ownerId: user.id, locale});
   revalidatePath(`/${locale}/hypotheses/${hypothesisId}`);
   if (breakthroughSession) revalidatePath(`/${locale}/breakthroughs/${breakthroughSession.id}`);
 }
@@ -190,6 +193,8 @@ export async function runParameterCalculationAction(
     }
   });
 
+  await completeResearchTaskForHypothesis({hypothesisId, ownerId: user.id, type: 'RUN_CALCULATION', conditionId: condition?.id});
+  await syncResearchTasksForHypothesis({hypothesisId, ownerId: user.id, locale});
   revalidatePath(`/${locale}/hypotheses/${hypothesisId}`);
   if (breakthroughSession) revalidatePath(`/${locale}/breakthroughs/${breakthroughSession.id}`);
 }

@@ -7,6 +7,7 @@ import {discoverSourceCandidates} from '@/lib/sources/source-discovery';
 import {requireCurrentUser} from '@/lib/auth/current-user';
 import {normalizeSourceRelationship, normalizeSourceType} from '@/lib/prisma/normalize-enums';
 import {toPrismaJsonObject} from '@/lib/prisma/safe-json';
+import {completeResearchTaskForHypothesis, syncResearchTasksForHypothesis} from '@/lib/workflow/research-mission-control';
 
 export async function discoverSourcesAction(
   locale: string,
@@ -79,6 +80,8 @@ export async function discoverSourcesAction(
     }
   });
 
+  await completeResearchTaskForHypothesis({hypothesisId, ownerId: user.id, type: 'DISCOVER_SOURCES', conditionId: condition?.id});
+  await syncResearchTasksForHypothesis({hypothesisId, ownerId: user.id, locale});
   revalidatePath(`/${locale}/hypotheses/${hypothesisId}`);
   if (breakthroughSession) revalidatePath(`/${locale}/breakthroughs/${breakthroughSession.id}`);
 }

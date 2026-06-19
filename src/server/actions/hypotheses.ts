@@ -20,6 +20,7 @@ import {routeLocaleToPrisma} from '@/lib/locale/locale';
 import {localizeMockValue} from '@/lib/locale/mock-copy';
 import {toPrismaJson, toPrismaJsonObject} from '@/lib/prisma/safe-json';
 import {requireCurrentUser} from '@/lib/auth/current-user';
+import {completeResearchTaskForHypothesis, syncResearchTasksForHypothesis} from '@/lib/workflow/research-mission-control';
 
 export async function createProjectAction(locale: string, formData: FormData) {
   const user = await requireCurrentUser();
@@ -94,6 +95,8 @@ export async function startBreakthroughAction(locale: string, conditionId: strin
       },
     },
   });
+  await completeResearchTaskForHypothesis({hypothesisId: condition.hypothesisId, ownerId: user.id, type: 'START_BREAKTHROUGH', conditionId: condition.id});
+  await syncResearchTasksForHypothesis({hypothesisId: condition.hypothesisId, ownerId: user.id, locale});
   redirect(`/${locale}/breakthroughs/${session.id}`);
 }
 
@@ -178,6 +181,7 @@ export async function regenerateEngineeringModelAction(locale: string, hypothesi
   });
 
   const latestScene = hypothesis.visualScenes[0];
+  const hadEngineeringModel = Boolean(parseEngineeringModel(latestScene?.engineeringModelJson));
   const latestSession = hypothesis.breakthroughSessions[0];
   await prisma.$transaction(async tx => {
     const scene = latestScene
@@ -219,6 +223,8 @@ export async function regenerateEngineeringModelAction(locale: string, hypothesi
     }
   });
 
+  await completeResearchTaskForHypothesis({hypothesisId: hypothesis.id, ownerId: user.id, type: hadEngineeringModel ? 'UPDATE_MODEL' : 'BUILD_ENGINEERING_MODEL'});
+  await syncResearchTasksForHypothesis({hypothesisId: hypothesis.id, ownerId: user.id, locale: routeLocale});
   revalidatePath(`/${routeLocale}/hypotheses/${hypothesis.id}`);
   if (latestSession) revalidatePath(`/${routeLocale}/breakthroughs/${latestSession.id}`);
 }
@@ -232,6 +238,8 @@ export async function updateEngineeringModelAction(locale: string, hypothesisId:
   validateEngineeringModelIntegrity(parsed.data);
   assertProtectedModulesPreserved(context.previousModel, parsed.data);
   await persistEngineeringModelUpdate({locale: routeLocale, ...context, model: parsed.data});
+  await completeResearchTaskForHypothesis({hypothesisId, ownerId: user.id, type: 'UPDATE_MODEL'});
+  await syncResearchTasksForHypothesis({hypothesisId, ownerId: user.id, locale: routeLocale});
 }
 
 export async function addEngineeringModuleAction(locale: string, hypothesisId: string, module: unknown) {

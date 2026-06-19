@@ -78,6 +78,7 @@ export async function buildLabLog(input: BuildLabLogInput): Promise<LabLogItem[]
     experiments,
     simulations,
     sessions,
+    researchTasks,
   ] = await Promise.all([
     prisma.hypothesis.findMany({where: {id: {in: hypothesisIds}, ownerId: user.id}}),
     prisma.hypothesisAnalysis.findMany({where: {hypothesisId: {in: hypothesisIds}}, orderBy: {createdAt: 'desc'}}),
@@ -97,6 +98,9 @@ export async function buildLabLog(input: BuildLabLogInput): Promise<LabLogItem[]
     }),
     breakthroughOnly ? Promise.resolve([]) : prisma.simulationRun.findMany({where: {hypothesisId: {in: hypothesisIds}}, orderBy: {createdAt: 'desc'}}),
     prisma.breakthroughSession.findMany({where: sessionWhere, orderBy: {createdAt: 'desc'}}),
+    breakthroughOnly
+      ? prisma.researchTask.findMany({where: {breakthroughSessionId: sessionContext!.id}, orderBy: {createdAt: 'desc'}})
+      : prisma.researchTask.findMany({where: {hypothesisId: {in: hypothesisIds}, hypothesis: {ownerId: user.id}}, orderBy: {createdAt: 'desc'}}),
   ]);
 
   const sessionIds = sessions.map(session => session.id);
@@ -261,6 +265,24 @@ export async function buildLabLog(input: BuildLabLogInput): Promise<LabLogItem[]
     });
   }
 
+  for (const task of researchTasks) {
+    items.push({
+      id: `research-task-${task.id}`,
+      timestamp: task.createdAt,
+      type: 'RESEARCH_TASK_CREATED',
+      title: labels.researchTaskCreated,
+      description: task.description,
+      severity: task.priority === 'CRITICAL' ? 'critical' : task.priority === 'HIGH' ? 'warning' : task.status === 'DONE' ? 'success' : 'info',
+      sourceType: 'system',
+      href: `/${locale}/hypotheses/${task.hypothesisId}?section=${task.targetSection}`,
+      metadata: {
+        [labels.metadata.status]: getEnumLabel(task.status, locale),
+        [labels.metadata.priority]: getEnumLabel(task.priority, locale),
+        [labels.metadata.task]: task.title,
+      },
+    });
+  }
+
   for (const session of sessions) {
     const condition = conditionById.get(session.conditionId);
     items.push({
@@ -368,6 +390,13 @@ function mapBreakthroughEvent(
     metadata: {
       [labels.metadata.count]: numberValue(content.physicalModules),
     },
+  };
+  if (type === 'AI_REASONING_STEP' && stringValue(content.eventKey) === 'RESEARCH_MISSION_CRITICAL_TASK') return {
+    title: labels.criticalResearchTaskCreated,
+    description: stringValue(content.message) || labels.researchTaskDescription,
+    severity: 'critical',
+    sourceType: 'system',
+    metadata: {[labels.metadata.task]: stringValue(content.taskTitles)},
   };
   if (type === 'STATUS_CHANGED') return {title: labels.statusChanged, description: stringValue(content.description), severity: 'info', sourceType: 'breakthrough', metadata: {[labels.metadata.status]: getEnumLabel(stringValue(content.status), locale)}};
   if (type === 'USER_NOTE') return {title: labels.userNote, description: stringValue(content.note), severity: 'info', sourceType: 'idea', metadata: stringValue(content.note) ? {[labels.metadata.note]: stringValue(content.note)} : undefined};

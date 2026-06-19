@@ -170,6 +170,29 @@ enum CalculationType {
   MEASUREMENT_SENSITIVITY_ESTIMATE
   GENERIC_ORDER_OF_MAGNITUDE
 }
+enum ResearchTaskType {
+  FORMALIZE
+  BUILD_MAP
+  BUILD_ENGINEERING_MODEL
+  RUN_CALCULATION
+  DISCOVER_SOURCES
+  START_BREAKTHROUGH
+  DESIGN_EXPERIMENT
+  REVIEW_RESULTS
+  UPDATE_MODEL
+}
+enum ResearchTaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  SKIPPED
+}
+enum ResearchTaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
 
 model User {
   id                   String                @id @default(cuid())
@@ -265,6 +288,7 @@ model Hypothesis {
   breakthroughSessions  BreakthroughSession[]
   simulationRuns        SimulationRun[]
   calculationRuns       CalculationRun[]
+  researchTasks         ResearchTask[]
 
   @@index([ownerId])
 }
@@ -352,6 +376,7 @@ model HypothesisCondition {
   breakthroughSessions  BreakthroughSession[]
   calculationRuns       CalculationRun[]
   sourceReferences      SourceReference[]
+  researchTasks         ResearchTask[]
 }
 
 model VisualScene {
@@ -442,8 +467,34 @@ model BreakthroughSession {
   ideas           BreakthroughIdea[]
   events          BreakthroughEvent[]
   calculationRuns CalculationRun[]
+  researchTasks   ResearchTask[]
 
   @@index([ownerId])
+}
+
+model ResearchTask {
+  id                    String @id @default(cuid())
+  hypothesisId          String
+  hypothesis            Hypothesis @relation(fields: [hypothesisId], references: [id], onDelete: Cascade)
+  conditionId           String?
+  condition             HypothesisCondition? @relation(fields: [conditionId], references: [id], onDelete: SetNull)
+  breakthroughSessionId String?
+  breakthroughSession   BreakthroughSession? @relation(fields: [breakthroughSessionId], references: [id], onDelete: SetNull)
+  type                  ResearchTaskType
+  status                ResearchTaskStatus @default(TODO)
+  priority              ResearchTaskPriority @default(MEDIUM)
+  title                 String
+  description           String
+  actionLabel           String
+  targetSection         String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  completedAt           DateTime?
+
+  @@index([hypothesisId, status, priority])
+  @@index([conditionId])
+  @@index([breakthroughSessionId])
+  @@index([type])
 }
 
 model CalculationRun {

@@ -139,12 +139,14 @@
       "openEngineeringModel": "Open Engineering Model",
       "openCalculations": "Open Calculations",
       "openLabLog": "Open Lab Log",
+      "openCurrentObjective": "Open current objective",
       "recommendation": "Recommendation",
       "currentState": "Current state",
       "searchCommands": "Search commands...",
       "ready": "Ready",
       "missing": "Missing",
       "criticalBlockers": "Critical blockers",
+      "syncMission": "Sync mission",
       "pending": "Working...",
       "overviewDescription": "Compact scientific summary, status, technical model and current research health.",
       "engineeringDescription": "Editable procedural engineering blueprint with physical modules, geometry plan and research overlays.",
@@ -195,6 +197,18 @@
         "sources": "Sources",
         "breakthrough": "Breakthrough",
         "experiment": "Experiment"
+      },
+      "mission": {
+        "title": "Research Mission",
+        "currentObjective": "Current objective",
+        "nextSteps": "Next steps",
+        "criticalTask": "Critical task",
+        "completed": "Completed",
+        "syncMission": "Sync mission",
+        "openTask": "Open task",
+        "done": "Done",
+        "inProgress": "In progress",
+        "pending": "Pending"
       }
     }
   },
@@ -505,9 +519,12 @@
     "modelParametersRecalculated": "Model parameters recalculated",
     "engineeringModelRegenerated": "Engineering model regenerated",
     "engineeringModelUpdated": "Engineering model updated",
+    "researchTaskCreated": "Research mission task created",
+    "criticalResearchTaskCreated": "Critical research mission task created",
     "parameterCalculationDescription": "The deterministic model was recalculated with a new parameter set.",
     "engineeringModelRegeneratedDescription": "The engineering synthesis was rebuilt from the latest conditions, calculations, sources and breakthrough sessions.",
     "engineeringModelUpdatedDescription": "Manual Engineering Model Studio edits were saved to the canonical engineering model.",
+    "researchTaskDescription": "Mission Control created a task to keep the research workflow moving.",
     "versionCreated": "Hypothesis version created",
     "userNote": "Research note added",
     "conditionTreeDescription": "{count} research conditions were generated.",
@@ -532,7 +549,9 @@
       "testabilityImpact": "Testability impact",
       "version": "Version",
       "check": "Check",
-      "note": "Note"
+      "note": "Note",
+      "priority": "Priority",
+      "task": "Task"
     },
     "sourceTypes": {
       "hypothesis": "Hypothesis",

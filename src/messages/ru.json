@@ -184,7 +184,6 @@
       "cockpit": "Пульт гипотезы",
       "researchFlow": "Путь исследования",
       "status": "Состояние",
-      "openLabLog": "Открыть журнал",
       "map": "Карта прорыва",
       "modulePrimitiveStatus": "Модули / примитивы",
       "flow": {
@@ -195,6 +194,20 @@
         "sources": "Источники",
         "breakthrough": "Прорыв",
         "experiment": "Эксперимент"
+      },
+      "openCurrentObjective": "Открыть текущую цель",
+      "syncMission": "Синхронизировать миссию",
+      "mission": {
+        "title": "Миссия исследования",
+        "currentObjective": "Текущая цель",
+        "nextSteps": "Следующие шаги",
+        "criticalTask": "Критическая задача",
+        "completed": "Выполнено",
+        "syncMission": "Синхронизировать миссию",
+        "openTask": "Открыть задачу",
+        "done": "Завершено",
+        "inProgress": "В работе",
+        "pending": "Ожидает"
       }
     }
   },
@@ -530,7 +543,9 @@
       "testabilityImpact": "Влияние на проверяемость",
       "version": "Версия",
       "check": "Проверка",
-      "note": "Заметка"
+      "note": "Заметка",
+      "priority": "Приоритет",
+      "task": "Задача"
     },
     "sourceTypes": {
       "hypothesis": "Гипотеза",
@@ -550,7 +565,10 @@
       "critical": "Критично"
     },
     "engineeringModelUpdated": "Инженерная модель изменена",
-    "engineeringModelUpdatedDescription": "Ручные изменения Engineering Model Studio сохранены в каноническую инженерную модель."
+    "engineeringModelUpdatedDescription": "Ручные изменения Engineering Model Studio сохранены в каноническую инженерную модель.",
+    "researchTaskCreated": "Создана задача миссии исследования",
+    "criticalResearchTaskCreated": "Создана критическая задача миссии исследования",
+    "researchTaskDescription": "Mission Control создал задачу, чтобы продвинуть исследовательский процесс."
   },
   "settings": {
     "title": "Настройки",

@@ -23,6 +23,7 @@ export function HypothesisCommandPalette({
     regenerateModel: CommandAction;
     runCalculation: CommandAction;
     startBreakthrough?: CommandAction;
+    syncMission: CommandAction;
   };
   labels: {
     commandPalette: string;
@@ -30,6 +31,7 @@ export function HypothesisCommandPalette({
     copyLink: string;
     discoverSources: string;
     openCalculations: string;
+    openCurrentObjective: string;
     openEngineeringModel: string;
     openLabLog: string;
     pending: string;
@@ -38,9 +40,11 @@ export function HypothesisCommandPalette({
     runCalculation: string;
     searchPlaceholder: string;
     startBreakthrough: string;
+    syncMission: string;
   };
   links: {
     calculations: string;
+    currentObjective: string;
     engineering: string;
     labLog: string;
   };
@@ -97,6 +101,7 @@ export function HypothesisCommandPalette({
   };
 
   const commands = useMemo<CommandItem[]>(() => [
+    {id: 'open-current-objective', label: labels.openCurrentObjective, run: () => openSection(links.currentObjective)},
     {id: 'open-engineering', label: labels.openEngineeringModel, run: () => openSection(links.engineering)},
     {id: 'open-calculations', label: labels.openCalculations, run: () => openSection(links.calculations)},
     {id: 'run-calculation', label: labels.runCalculation, tone: 'action', run: () => runServerAction('run-calculation', actions.runCalculation)},
@@ -109,6 +114,7 @@ export function HypothesisCommandPalette({
       run: () => actions.startBreakthrough && runServerAction('start-breakthrough', actions.startBreakthrough),
     },
     {id: 'regenerate-model', label: labels.regenerateModel, tone: 'action', run: () => runServerAction('regenerate-model', actions.regenerateModel)},
+    {id: 'sync-mission', label: labels.syncMission, tone: 'action', run: () => runServerAction('sync-mission', actions.syncMission)},
     {id: 'open-lab-log', label: labels.openLabLog, run: () => openSection(links.labLog)},
     {id: 'copy-link', label: copied ? labels.copied : labels.copyLink, run: () => void copyLink()},
   ], [actions, copied, labels, links]);

@@ -23,6 +23,7 @@ import {HypothesisQuickActions} from '@/components/hypothesis/HypothesisQuickAct
 import {HypothesisResearchFlow, type ResearchFlowItem} from '@/components/hypothesis/HypothesisResearchFlow';
 import {NextBestActionPanel} from '@/components/hypothesis/NextBestActionPanel';
 import {PendingActionButton} from '@/components/hypothesis/PendingActionButton';
+import {ResearchMissionControl, type ResearchMissionControlTask} from '@/components/hypothesis/ResearchMissionControl';
 import {createMockAnalysisTranslation} from '@/lib/ai/analyze-hypothesis';
 import {localizeMockValue} from '@/lib/locale/mock-copy';
 import {getEnumLabel, getExperimentDifficultyLabel, getExperimentTypeLabel, getSafetyLevelLabel, getVerdictLevelLabel} from '@/lib/locale/enum-labels';
@@ -34,7 +35,9 @@ import {enrichEngineeringModelContext, synthesizeEngineeringModelFallback} from 
 import {runCalculationAction, runParameterCalculationAction} from '@/server/actions/calculations';
 import {discoverSourcesAction} from '@/server/actions/sources';
 import {regenerateEngineeringModelAction, resetEngineeringModelAction, startBreakthroughAction, updateEngineeringModelAction} from '@/server/actions/hypotheses';
+import {syncResearchMissionAction} from '@/server/actions/workflow';
 import {getCurrentUser} from '@/lib/auth/current-user';
+import {syncResearchTasksForHypothesis, type ResearchMissionTask} from '@/lib/workflow/research-mission-control';
 import {notFound, redirect} from 'next/navigation';
 
 type HypothesisSection = 'overview' | 'engineering' | 'map' | 'calculations' | 'sources' | 'experiments' | 'breakthroughs' | 'lab-log' | 'versions';
@@ -71,6 +74,7 @@ export default async function HypothesisPage({params, searchParams}: {params: Pr
   });
 
   if (!hypothesis || !hypothesis.analyses[0]) notFound();
+  const mission = await syncResearchTasksForHypothesis({locale, hypothesisId: id, ownerId: user.id});
   const labLogItems = await buildLabLog({locale: locale === 'ru' ? 'ru' : 'en', hypothesisId: id});
   const analysis = hypothesis.analyses[0];
   const translation = createMockAnalysisTranslation({title: hypothesis.originalTitle, text: hypothesis.originalText, locale});
@@ -331,7 +335,22 @@ export default async function HypothesisPage({params, searchParams}: {params: Pr
   const latestEngineeringActivity = hypothesis.visualScenes[0]?.createdAt ? formatDate(hypothesis.visualScenes[0].createdAt, locale) : cockpitT('noData');
   const engineeringPrimitiveCount = engineeringModel.geometryPlan.primitives.length;
   const latestCalculationGap = hypothesis.calculationRuns[0] ? getCalculationGapLabelFromRun(hypothesis.calculationRuns[0].resultJson, locale) : cockpitT('noData');
-  const nextAction = chooseNextAction({
+  const missionTasks = mission.tasks.map(task => toMissionTaskView({
+    task,
+    conditionId: task.conditionId,
+    hypothesisId: hypothesis.id,
+    labels: {pending: cockpitT('pending'), openTask: cockpitT('openTask')},
+    locale,
+    sectionHref,
+  }));
+  const currentMissionTask = mission.currentTask
+    ? missionTasks.find(task => task.id === mission.currentTask?.id)
+    : undefined;
+  const nextMissionTaskViews = mission.nextTasks
+    .map(task => missionTasks.find(item => item.id === task.id))
+    .filter((task): task is ResearchMissionControlTask => Boolean(task));
+  const missionTaskByType = new Map(missionTasks.map(task => [task.type, task]));
+  const fallbackNextAction = chooseNextAction({
     calculationCount: hypothesis.calculationRuns.length,
     criticalCondition: criticalConditions[0],
     experimentCount: experiments.length,
@@ -343,13 +362,12 @@ export default async function HypothesisPage({params, searchParams}: {params: Pr
     sourceCount: sources.length,
     cockpitT,
   });
-  const navigatorMissingData = [
-    ...(!hasPersistedEngineeringModel ? [cockpitT('engineering')] : []),
-    ...(hypothesis.calculationRuns.length === 0 ? [cockpitT('calculations')] : []),
-    ...(sources.length === 0 ? [cockpitT('sources')] : []),
-    ...(experiments.length === 0 ? [cockpitT('experiments')] : []),
-    ...(criticalConditions.length ? [cockpitT('criticalBlockers')] : []),
-  ];
+  const nextAction = currentMissionTask
+    ? {title: currentMissionTask.title, reason: currentMissionTask.description, action: currentMissionTask.action || <GlowButton href={currentMissionTask.href}>{currentMissionTask.actionLabel}</GlowButton>}
+    : fallbackNextAction;
+  const navigatorMissingData = mission.nextTasks.length
+    ? mission.nextTasks.map(task => task.title)
+    : [cockpitT('noData')];
   const navigatorSignals: HypothesisNavigatorSignal[] = [
     {
       label: cockpitT('engineering'),
@@ -493,6 +511,7 @@ export default async function HypothesisPage({params, searchParams}: {params: Pr
               regenerateModel: regenerateEngineeringModelAction.bind(null, locale, hypothesis.id),
               runCalculation: runCalculationAction.bind(null, locale, hypothesis.id, undefined, undefined),
               ...(primaryBlocker?.id ? {startBreakthrough: startBreakthroughAction.bind(null, locale, primaryBlocker.id)} : {}),
+              syncMission: syncResearchMissionAction.bind(null, locale, hypothesis.id),
             }}
             labels={{
               commandPalette: cockpitT('commandPalette'),
@@ -500,6 +519,7 @@ export default async function HypothesisPage({params, searchParams}: {params: Pr
               copyLink: cockpitT('copyLink'),
               discoverSources: cockpitT('discoverSources'),
               openCalculations: cockpitT('openCalculations'),
+              openCurrentObjective: cockpitT('openCurrentObjective'),
               openEngineeringModel: cockpitT('openEngineeringModel'),
               openLabLog: cockpitT('openLabLog'),
               pending: cockpitT('pending'),
@@ -508,9 +528,11 @@ export default async function HypothesisPage({params, searchParams}: {params: Pr
               runCalculation: cockpitT('runCalculation'),
               searchPlaceholder: cockpitT('searchCommands'),
               startBreakthrough: cockpitT('startBreakthrough'),
+              syncMission: cockpitT('syncMission'),
             }}
             links={{
               calculations: sectionHref('calculations'),
+              currentObjective: currentMissionTask?.href || sectionHref('overview'),
               engineering: sectionHref('engineering'),
               labLog: sectionHref('lab-log'),
             }}
@@ -545,6 +567,28 @@ export default async function HypothesisPage({params, searchParams}: {params: Pr
         <HypothesisProgressStrip items={[{label: t('researchProgress'), value: analysis.researchProgress}, {label: t('functionalityProgress'), value: analysis.functionalityProgress}, {label: t('testabilityProgress'), value: analysis.testabilityProgress}]} />
         <HealthPanel labels={{health: cockpitT('health'), strongestBlocker: cockpitT('strongestBlocker'), weakestProgress: cockpitT('weakestProgress'), latestActivity: cockpitT('latestActivity'), noData: cockpitT('noData')}} latestActivity={latestActivity} strongestBlocker={primaryBlocker?.title} weakestProgress={weakestProgress.label + ': ' + Math.round(weakestProgress.value) + '%'} />
       </div>
+
+      <ResearchMissionControl
+        completedCount={mission.completedCount}
+        criticalTodoCount={mission.criticalTodoCount}
+        currentTask={currentMissionTask}
+        labels={{
+          completed: cockpitT('mission.completed'),
+          criticalTask: cockpitT('mission.criticalTask'),
+          currentObjective: cockpitT('mission.currentObjective'),
+          done: cockpitT('mission.done'),
+          inProgress: cockpitT('mission.inProgress'),
+          mission: cockpitT('mission.title'),
+          nextSteps: cockpitT('mission.nextSteps'),
+          openTask: cockpitT('mission.openTask'),
+          pending: cockpitT('mission.pending'),
+          syncMission: cockpitT('mission.syncMission'),
+        }}
+        nextTasks={nextMissionTaskViews}
+        progress={mission.progress}
+        syncAction={<form action={syncResearchMissionAction.bind(null, locale, hypothesis.id)}><PendingActionButton className="rounded-xl border border-cyan-100/[0.1] bg-black/30 px-3 py-2 font-mono text-[9px] tracking-[.1em] text-cyan-100/55 uppercase" idleLabel={cockpitT('mission.syncMission')} pendingLabel={cockpitT('pending')} /></form>}
+        totalCount={mission.tasks.length}
+      />
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_24rem] xl:items-start">
         <div className="space-y-4">
@@ -622,15 +666,15 @@ export default async function HypothesisPage({params, searchParams}: {params: Pr
           {latestParameterRun && <div className="mt-5"><SectionHeader code="LATEST" title={calc('latestResult')} detail={getCalculationGapLabelFromRun(latestParameterRun.resultJson, locale)} /><div className="mt-4"><CalculationCard calculation={latestParameterRun} labels={calculationLabels} locale={locale} subject={hypothesis.originalTitle} /></div></div>}
           <div className="mt-5"><ParameterPlayground action={runParameterCalculationAction.bind(null, locale, hypothesis.id, undefined, undefined)} defaultScale={analysis.scale} labels={calculationLabels.playground} locale={locale} /></div>
           <div className="mt-5 grid gap-3 border-t border-cyan-100/[0.07] pt-5 md:grid-cols-2 xl:grid-cols-3">{conditions.map(condition => <form action={runCalculationAction.bind(null, locale, hypothesis.id, condition.id, undefined)} className="flex items-center justify-between gap-4 rounded-xl border border-cyan-100/[0.07] bg-black/25 p-4" key={condition.id}><span className="text-xs leading-5 text-cyan-50/75">{condition.title}</span><PendingActionButton className="rounded-lg border border-cyan-100/[0.1] bg-black/30 px-3 py-2 font-mono text-[9px] tracking-[.09em] text-cyan-100/55 uppercase" idleLabel={calc('runForCondition')} pendingLabel={cockpitT('pending')} /></form>)}</div>
-          {calculationHistory.length ? <div className="mt-6 grid gap-4 xl:grid-cols-2">{calculationHistory.map(calculation => <CalculationCard calculation={calculation} labels={calculationLabels} locale={locale} subject={calculation.condition ? localizeMockValue(calculation.condition, locale).title : hypothesis.originalTitle} key={calculation.id} />)}</div> : !latestParameterRun && <EmptyState text={calc('empty')} />}
+          {calculationHistory.length ? <div className="mt-6 grid gap-4 xl:grid-cols-2">{calculationHistory.map(calculation => <CalculationCard calculation={calculation} labels={calculationLabels} locale={locale} subject={calculation.condition ? localizeMockValue(calculation.condition, locale).title : hypothesis.originalTitle} key={calculation.id} />)}</div> : !latestParameterRun && <TaskEmptyState openTask={cockpitT('mission.openTask')} task={missionTaskByType.get('RUN_CALCULATION')} text={calc('empty')} />}
         </HypothesisActiveSection>
       )}
 
-      {selectedSection === 'sources' && <HypothesisActiveSection code="SRC-05" description={sourceT('description')} title={sourceT('title')}><div className="mb-5 flex justify-end"><form action={discoverSourcesAction.bind(null, locale, hypothesis.id, undefined)}><PendingActionButton idleLabel={sourceT('discover')} pendingLabel={cockpitT('pending')} /></form></div>{sources.length ? <div className="grid gap-4 md:grid-cols-2">{sources.map(source => <SourceCandidateCard source={source} summary={source.summary} locale={locale} labels={{candidate: sourceT('candidate'), openSearch: sourceT('openSearch')}} key={source.id} />)}</div> : <EmptyState text={sourceT('empty')} />}</HypothesisActiveSection>}
+      {selectedSection === 'sources' && <HypothesisActiveSection code="SRC-05" description={sourceT('description')} title={sourceT('title')}><div className="mb-5 flex justify-end"><form action={discoverSourcesAction.bind(null, locale, hypothesis.id, undefined)}><PendingActionButton idleLabel={sourceT('discover')} pendingLabel={cockpitT('pending')} /></form></div>{sources.length ? <div className="grid gap-4 md:grid-cols-2">{sources.map(source => <SourceCandidateCard source={source} summary={source.summary} locale={locale} labels={{candidate: sourceT('candidate'), openSearch: sourceT('openSearch')}} key={source.id} />)}</div> : <TaskEmptyState openTask={cockpitT('mission.openTask')} task={missionTaskByType.get('DISCOVER_SOURCES')} text={sourceT('empty')} />}</HypothesisActiveSection>}
 
-      {selectedSection === 'experiments' && <HypothesisActiveSection code="EXP-06" description={cockpitT('experimentsDescription')} title={t('tabs.experiments')}>{experiments.length ? <div className="grid gap-4 md:grid-cols-2">{experiments.map((experiment, index) => <ExperimentCard experiment={experiment} index={index} labels={{signal: e('signal'), falsification: e('falsification')}} locale={locale} key={experiment.id} />)}</div> : <EmptyState text={cockpitT('emptyExperiments')} />}</HypothesisActiveSection>}
+      {selectedSection === 'experiments' && <HypothesisActiveSection code="EXP-06" description={cockpitT('experimentsDescription')} title={t('tabs.experiments')}>{experiments.length ? <div className="grid gap-4 md:grid-cols-2">{experiments.map((experiment, index) => <ExperimentCard experiment={experiment} index={index} labels={{signal: e('signal'), falsification: e('falsification')}} locale={locale} key={experiment.id} />)}</div> : <TaskEmptyState openTask={cockpitT('mission.openTask')} task={missionTaskByType.get('DESIGN_EXPERIMENT')} text={cockpitT('emptyExperiments')} />}</HypothesisActiveSection>}
 
-      {selectedSection === 'breakthroughs' && <HypothesisActiveSection code="BRK-07" description={cockpitT('activeBreakthroughsDescription')} title={cockpitT('activeBreakthroughs')}>{visualLabBreakthroughs.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{visualLabBreakthroughs.map(session => <BreakthroughSessionCard href={session.href} key={session.id} open={cockpitT('open')} progress={session.progressScore} title={session.title} />)}</div> : <EmptyState text={cockpitT('emptyBreakthroughs')} />}</HypothesisActiveSection>}
+      {selectedSection === 'breakthroughs' && <HypothesisActiveSection code="BRK-07" description={cockpitT('activeBreakthroughsDescription')} title={cockpitT('activeBreakthroughs')}>{visualLabBreakthroughs.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{visualLabBreakthroughs.map(session => <BreakthroughSessionCard href={session.href} key={session.id} open={cockpitT('open')} progress={session.progressScore} title={session.title} />)}</div> : <TaskEmptyState openTask={cockpitT('mission.openTask')} task={missionTaskByType.get('START_BREAKTHROUGH')} text={cockpitT('emptyBreakthroughs')} />}</HypothesisActiveSection>}
 
       {selectedSection === 'lab-log' && <HypothesisActiveSection code="LOG-08" description={cockpitT('labLogDescription')} title={labT('title')}><LabLogTimeline items={labLogItems} locale={locale} labels={labLogLabels} /></HypothesisActiveSection>}
 
@@ -640,6 +684,51 @@ export default async function HypothesisPage({params, searchParams}: {params: Pr
 }
 
 type WorkspaceTranslator = (key: string) => string;
+
+function toMissionTaskView({
+  task,
+  hypothesisId,
+  labels,
+  locale,
+  sectionHref,
+}: {
+  conditionId?: string | null;
+  hypothesisId: string;
+  labels: {openTask: string; pending: string};
+  locale: string;
+  sectionHref: (section: HypothesisSection) => string;
+  task: ResearchMissionTask;
+}): ResearchMissionControlTask {
+  const targetSection = sectionIds.includes(task.targetSection as HypothesisSection) ? task.targetSection as HypothesisSection : 'overview';
+  const href = sectionHref(targetSection);
+  const action = (() => {
+    if (task.type === 'RUN_CALCULATION') {
+      return <form action={runCalculationAction.bind(null, locale, hypothesisId, task.conditionId ?? undefined, task.breakthroughSessionId ?? undefined)}><PendingActionButton idleLabel={task.actionLabel} pendingLabel={labels.pending} /></form>;
+    }
+    if (task.type === 'DISCOVER_SOURCES') {
+      return <form action={discoverSourcesAction.bind(null, locale, hypothesisId, task.conditionId ?? undefined)}><PendingActionButton idleLabel={task.actionLabel} pendingLabel={labels.pending} /></form>;
+    }
+    if ((task.type === 'BUILD_ENGINEERING_MODEL' || task.type === 'UPDATE_MODEL')) {
+      return <form action={regenerateEngineeringModelAction.bind(null, locale, hypothesisId)}><PendingActionButton idleLabel={task.actionLabel} pendingLabel={labels.pending} /></form>;
+    }
+    if (task.type === 'START_BREAKTHROUGH' && task.conditionId) {
+      return <form action={startBreakthroughAction.bind(null, locale, task.conditionId)}><PendingActionButton idleLabel={task.actionLabel} pendingLabel={labels.pending} /></form>;
+    }
+    return <GlowButton href={href} variant="secondary">{task.actionLabel || labels.openTask}</GlowButton>;
+  })();
+  return {
+    id: task.id,
+    action,
+    actionLabel: task.actionLabel,
+    description: task.description,
+    href,
+    priority: task.priority,
+    status: task.status,
+    targetSection: task.targetSection,
+    title: task.title,
+    type: task.type,
+  };
+}
 
 type NextActionInput = {
   calculationCount: number;
@@ -726,6 +815,24 @@ function BreakthroughSessionCard({href, open, progress, title}: {href?: string; 
 
 function EmptyState({text}: {text: string}) {
   return <p className="mt-5 rounded-xl border border-dashed border-cyan-100/[0.1] px-5 py-4 text-xs text-[#78999b]">{text}</p>;
+}
+
+function TaskEmptyState({openTask, task, text}: {openTask: string; task?: ResearchMissionControlTask; text: string}) {
+  return (
+    <div className="mt-5 rounded-xl border border-dashed border-cyan-100/[0.12] bg-black/20 px-5 py-4">
+      <p className="text-xs leading-5 text-[#78999b]">{text}</p>
+      {task && (
+        <div className="mt-4 flex flex-col justify-between gap-3 rounded-xl border border-cyan-100/[0.08] bg-cyan-300/[0.025] p-3 sm:flex-row sm:items-center">
+          <div>
+            <div className="mono-label">{openTask}</div>
+            <p className="mt-1 text-xs font-semibold text-cyan-50">{task.title}</p>
+            <p className="mt-1 text-[10px] leading-4 text-cyan-50/45">{task.description}</p>
+          </div>
+          <div className="shrink-0">{task.action}</div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function formatDate(value: Date, locale: string): string {
